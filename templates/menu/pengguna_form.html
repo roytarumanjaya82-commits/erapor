@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}{% if row.id %}Ubah Pengguna{% else %}Tambah Pengguna{% endif %}{% endblock %}
+{% block content %}
+<div class="crumb">Data Pengguna <span>›</span> {% if row.id %}Ubah{% else %}Tambah{% endif %}</div>
+<div class="page-head">
+  <h1 class="page-title">{% if row.id %}Ubah Pengguna{% else %}Tambah Pengguna{% endif %}</h1>
+</div>
+<form method="post" class="card">
+  <div class="form-grid">
+    <div><label>Username</label><input name="username" value="{{ row.username or '' }}" required></div>
+    <div><label>Nama pengguna</label><input name="nama" value="{{ row.nama or '' }}" required></div>
+    <div><label>e-Mail</label><input type="email" name="email" value="{{ row.email or '' }}" placeholder="nama@erapor.local"></div>
+    <div><label>Kata sandi{% if row.id %} (kosongkan jika tidak diubah){% endif %}</label><input type="password" name="password" value="" placeholder="{% if row.id %}Tidak diubah{% else %}guru123{% endif %}"></div>
+    <div>
+      <label>Level</label>
+      <select name="role" id="level-pengguna">
+        {% for kode, label in [('admin','Admin'),('guru','Guru'),('siswa','Siswa')] %}
+        <option value="{{ kode }}" {% if (row.role or 'guru')==kode %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label>Status aktif</label>
+      <select name="aktif">
+        <option value="1" {% if row.aktif!=0 %}selected{% endif %}>Aktif</option>
+        <option value="0" {% if row.aktif==0 %}selected{% endif %}>Nonaktif</option>
+      </select>
+    </div>
+    <div class="full" id="blok-guru">
+      <label>Terhubung ke data guru</label>
+      <select name="guru_id">
+        <option value="">-</option>
+        {% for g in guru %}<option value="{{ g.id }}" {% if row.guru_id==g.id %}selected{% endif %}>{{ g.nama }}</option>{% endfor %}
+      </select>
+      <p class="sub">Centang tugas input. Menu guru mengikuti centang ini, ditambah tugas dari wali kelas, pelajaran, ekskul, atau tahfidz.</p>
+      <label class="check"><input type="checkbox" name="tugas" value="bidang_studi" {% if 'bidang_studi' in tugas_aktif %}checked{% endif %}> Guru bidang studi</label>
+      <label class="check"><input type="checkbox" name="tugas" value="walas" {% if 'walas' in tugas_aktif %}checked{% endif %}> Wali kelas</label>
+      <label class="check"><input type="checkbox" name="tugas" value="ekskul" {% if 'ekskul' in tugas_aktif %}checked{% endif %}> Guru ekstrakurikuler</label>
+      <label class="check"><input type="checkbox" name="tugas" value="tahfidz" {% if 'tahfidz' in tugas_aktif %}checked{% endif %}> Guru tahfidz</label>
+    </div>
+  </div>
+  <div class="form-actions">
+    <button class="btn btn-amber" type="submit">Simpan</button>
+    <a class="btn btn-ghost" href="{{ url_for('menu.pengguna') }}">Batal</a>
+  </div>
+</form>
+<script>
+  const level = document.getElementById('level-pengguna');
+  const blok = document.getElementById('blok-guru');
+  function tampilTugas() { blok.style.display = level.value === 'guru' ? '' : 'none'; }
+  level.addEventListener('change', tampilTugas);
+  tampilTugas();
+</script>
+{% endblock %}

@@ -1,34 +1,58 @@
 {% extends "base.html" %}
 {% block title %}Gabung Mapel{% endblock %}
+{% block content_class %}content-wide{% endblock %}
 {% block content %}
-<h1 class="page-title">Gabung Mapel</h1>
-<div class="card">
-  <form method="post" style="margin-bottom:18px">
-    <div class="form-grid">
-      <div class="full"><label>Nama gabungan</label><input type="text" name="nama_gabungan" required></div>
-      <div class="full">
-        <label>Pilih mapel</label>
-        {% for m in mapel %}
-        <label class="check"><input type="checkbox" name="mapel_id" value="{{ m.id }}"> {{ m.nama }}</label>
-        {% endfor %}
-      </div>
-    </div>
-    <div class="form-actions"><button class="btn btn-primary">Simpan gabungan</button></div>
-  </form>
+<div class="crumb">Gabung Mapel <span>›</span> Daftar</div>
+<div class="page-head">
+  <h1 class="page-title">Gabung Mapel</h1>
+  <a class="btn btn-amber" href="{{ url_for('main.form_gabung') }}">Buat gabung mapel</a>
+</div>
+<div class="card" style="padding:8px 16px 16px;overflow:auto">
+  <div class="toolbar">
+    <span></span>
+    <form method="get">
+      <input type="hidden" name="arah" value="{{ arah }}">
+      <input type="hidden" name="per" value="{{ per }}">
+      <input class="search" name="q" value="{{ q }}" placeholder="Cari">
+    </form>
+  </div>
   <table class="data">
-    <thead><tr><th>Nama gabungan</th><th>Mapel</th><th></th></tr></thead>
+    <thead>
+      <tr>
+        <th><a class="sort" href="{{ url_for('main.gabung_mapel', q=q, per=per, arah='desc' if arah=='asc' else 'asc') }}">Nama Penggabungan Mapel</a></th>
+        {% if rows %}<th></th>{% endif %}
+      </tr>
+    </thead>
     <tbody>
     {% for r in rows %}
       <tr>
-        <td>{{ r.nama_gabungan }}</td><td>{{ r.items }}</td>
-        <td>
-          <form method="post" action="{{ url_for('main.hapus_gabung', item_id=r.id) }}" onsubmit="return confirm('Hapus?')">
-            <button class="btn btn-danger btn-sm">Hapus</button>
-          </form>
+        <td>{{ r.nama_gabungan }}</td>
+        <td class="actions"><a class="btn-ubah" href="{{ url_for('main.form_gabung', item_id=r.id) }}">Ubah</a></td>
+      </tr>
+    {% else %}
+      <tr>
+        <td class="empty-state">
+          <div class="empty-x" aria-hidden="true">×</div>
+          Tidak ada data yang ditemukan
         </td>
       </tr>
     {% endfor %}
     </tbody>
   </table>
+  {% if total %}
+  <div class="pager">
+    <span>Menampilkan {{ awal }} sampai {{ akhir }} dari {{ total }} hasil</span>
+    <form method="get" class="pager-form">
+      <input type="hidden" name="q" value="{{ q }}">
+      <input type="hidden" name="arah" value="{{ arah }}">
+      {% if halaman > 1 %}<a href="{{ url_for('main.gabung_mapel', q=q, arah=arah, per=per, halaman=halaman-1) }}">Sebelumnya</a>{% endif %}
+      {% if akhir < total %}<a href="{{ url_for('main.gabung_mapel', q=q, arah=arah, per=per, halaman=halaman+1) }}">Berikutnya</a>{% endif %}
+      <label>per halaman</label>
+      <select name="per" onchange="this.form.submit()">
+        {% for n in [10, 25, 50, 100] %}<option value="{{ n }}" {% if per == n %}selected{% endif %}>{{ n }}</option>{% endfor %}
+      </select>
+    </form>
+  </div>
+  {% endif %}
 </div>
 {% endblock %}

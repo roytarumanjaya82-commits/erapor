@@ -1,33 +1,116 @@
 {% extends "base.html" %}
-{% block title %}Ekstrakurikuler{% endblock %}
+{% block title %}Data Ekstra Kurikuler{% endblock %}
+{% block content_class %}content-wide{% endblock %}
 {% block content %}
-<h1 class="page-title">Data Ekstra Kurikuler</h1>
-<div class="card">
-  <form method="post" class="form-grid" style="margin-bottom:18px">
-    <div><label>Nama</label><input type="text" name="nama" required></div>
-    <div>
-      <label>Pembina</label>
-      <select name="pembina_id">
-        <option value="">-</option>
-        {% for g in guru %}<option value="{{ g.id }}">{{ g.nama }}</option>{% endfor %}
-      </select>
-    </div>
-    <div style="display:flex;align-items:end"><button class="btn btn-primary">Tambah</button></div>
-  </form>
-  <table class="data">
-    <thead><tr><th>Nama</th><th>Pembina</th><th></th></tr></thead>
-    <tbody>
-    {% for r in rows %}
-      <tr>
-        <td>{{ r.nama }}</td><td>{{ r.pembina or '-' }}</td>
-        <td>
-          <form method="post" action="{{ url_for('main.hapus_ekskul', item_id=r.id) }}" onsubmit="return confirm('Hapus?')">
-            <button class="btn btn-danger btn-sm">Hapus</button>
-          </form>
-        </td>
-      </tr>
-    {% endfor %}
-    </tbody>
-  </table>
+{% set admin = current_user and current_user.role == 'admin' %}
+<div class="crumb">Data Ekstra Kurikuler <span>›</span> Daftar</div>
+<div class="page-head">
+  <h1 class="page-title">Data Ekstra Kurikuler</h1>
+  {% if admin %}<a class="btn btn-amber" href="{{ url_for('main.form_ekskul') }}">Buat ekstra kurikuler</a>{% endif %}
 </div>
+<div class="card" style="padding:8px 16px 16px;overflow:auto">
+  <div class="toolbar">
+    <span></span>
+    <div class="icon-tools">
+      <form method="get">
+        <input type="hidden" name="pembina_id" value="{{ pembina_id }}">
+        <input type="hidden" name="urut" value="{{ urut }}">
+        <input type="hidden" name="arah" value="{{ arah }}">
+        <input type="hidden" name="per" value="{{ per }}">
+        <input class="search" name="q" value="{{ q }}" placeholder="Cari">
+      </form>
+      <details class="tool-pop">
+        <summary class="icon-btn" aria-label="Filter">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5h16l-6 7v6l-4 2v-8z"/></svg>
+          <span class="count-dot">{{ saring }}</span>
+        </summary>
+        <form class="pop" method="get">
+          <input type="hidden" name="q" value="{{ q }}">
+          <input type="hidden" name="per" value="{{ per }}">
+          <label>Pembina</label>
+          <select name="pembina_id">
+            <option value="">Semua</option>
+            {% for g in guru %}
+            <option value="{{ g.id }}" {% if pembina_id|string == g.id|string %}selected{% endif %}>{{ g.nama }}</option>
+            {% endfor %}
+          </select>
+          <button class="btn btn-amber" type="submit">Terapkan</button>
+        </form>
+      </details>
+    </div>
+  </div>
+  <form method="post" action="{{ url_for('main.hapus_ekskul_terpilih') }}" onsubmit="return confirm('Hapus ekstra kurikuler yang dipilih?')">
+    {% if admin %}
+    <div class="bulk-bar" id="bulk-bar">
+      <span id="bulk-teks">0 dipilih</span>
+      <button class="btn btn-solid-danger btn-sm" type="submit">Hapus terpilih</button>
+    </div>
+    {% endif %}
+    <table class="data">
+      <thead>
+        <tr>
+          {% if admin %}<th><input type="checkbox" id="pilih-semua" aria-label="Pilih semua"></th>{% endif %}
+          <th><a class="sort" href="{{ url_for('main.data_ekskul', q=q, pembina_id=pembina_id, per=per, urut='nama', arah='desc' if urut=='nama' and arah=='asc' else 'asc') }}">Nama Ekskul</a></th>
+          <th><a class="sort" href="{{ url_for('main.data_ekskul', q=q, pembina_id=pembina_id, per=per, urut='pembina', arah='desc' if urut=='pembina' and arah=='asc' else 'asc') }}">Pembina</a></th>
+          <th>Semester</th>
+          <th><a class="sort" href="{{ url_for('main.data_ekskul', q=q, pembina_id=pembina_id, per=per, urut='peserta', arah='desc' if urut=='peserta' and arah=='asc' else 'asc') }}">Peserta</a></th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for r in rows %}
+        <tr>
+          {% if admin %}<td><input class="pilih-siswa" type="checkbox" name="id" value="{{ r.id }}"></td>{% endif %}
+          <td>{{ r.nama }}</td>
+          <td>{{ r.pembina or '-' }}</td>
+          <td><span class="pill-green">{{ semester }}</span></td>
+          <td><span class="pill-green">{{ r.peserta }}</span></td>
+          <td class="actions">
+            <a class="tautan-hijau" href="{{ url_for('main.peserta_ekskul', item_id=r.id) }}">Peserta</a>
+            {% if admin %}<a class="btn-ubah" href="{{ url_for('main.form_ekskul', item_id=r.id) }}">Ubah</a>{% endif %}
+          </td>
+        </tr>
+      {% else %}
+        <tr><td colspan="{{ 6 if admin else 5 }}" class="empty-state"><div class="empty-x">×</div>Tidak ada data yang ditemukan</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </form>
+  {% if total %}
+  <div class="pager">
+    <span>Menampilkan {{ awal }} sampai {{ akhir }} dari {{ total }} hasil</span>
+    <form method="get" class="pager-form">
+      <input type="hidden" name="q" value="{{ q }}">
+      <input type="hidden" name="pembina_id" value="{{ pembina_id }}">
+      <input type="hidden" name="urut" value="{{ urut }}">
+      <input type="hidden" name="arah" value="{{ arah }}">
+      {% if halaman > 1 %}<a href="{{ url_for('main.data_ekskul', q=q, pembina_id=pembina_id, urut=urut, arah=arah, per=per, halaman=halaman-1) }}">Sebelumnya</a>{% endif %}
+      {% if akhir < total %}<a href="{{ url_for('main.data_ekskul', q=q, pembina_id=pembina_id, urut=urut, arah=arah, per=per, halaman=halaman+1) }}">Berikutnya</a>{% endif %}
+      <label>per halaman</label>
+      <select name="per" onchange="this.form.submit()">
+        {% for n in [10, 25, 50, 100] %}<option value="{{ n }}" {% if per == n %}selected{% endif %}>{{ n }}</option>{% endfor %}
+      </select>
+    </form>
+  </div>
+  {% endif %}
+</div>
+<script>
+var semua = document.getElementById("pilih-semua");
+function hitungPilih() {
+  var n = document.querySelectorAll(".pilih-siswa:checked").length;
+  var bar = document.getElementById("bulk-bar");
+  if (!bar) return;
+  bar.classList.toggle("on", n > 0);
+  document.getElementById("bulk-teks").textContent = n + " dipilih";
+}
+if (semua) {
+  semua.addEventListener("change", function () {
+    document.querySelectorAll(".pilih-siswa").forEach(function (kotak) { kotak.checked = semua.checked; });
+    hitungPilih();
+  });
+  document.querySelectorAll(".pilih-siswa").forEach(function (kotak) {
+    kotak.addEventListener("change", hitungPilih);
+  });
+}
+</script>
 {% endblock %}

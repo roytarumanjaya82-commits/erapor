@@ -1,22 +1,167 @@
 {% extends "base.html" %}
-{% block title %}Mapping Rapor{% endblock %}
+{% block title %}Data Mapping Rapor{% endblock %}
+{% block content_class %}content-wide{% endblock %}
 {% block content %}
-<h1 class="page-title">Data Mapping Rapor</h1>
-<div class="card">
-  <form method="post">
-    <table class="data">
-      <thead><tr><th>Tampil</th><th>Mata pelajaran</th><th>Urutan</th></tr></thead>
-      <tbody>
-      {% for m in mapel %}
-        <tr>
-          <td><input type="checkbox" name="mapel_id" value="{{ m.id }}" {% if mapped.get(m.id) %}checked{% endif %}></td>
-          <td>{{ m.nama }}</td>
-          <td><input type="number" name="urutan_{{ m.id }}" value="{{ mapped[m.id].urutan if mapped.get(m.id) else loop.index }}" style="max-width:90px"></td>
-        </tr>
-      {% endfor %}
-      </tbody>
-    </table>
-    <div class="form-actions"><button class="btn btn-primary">Simpan mapping</button></div>
-  </form>
+{% macro kunci() %}
+<input type="hidden" name="kurikulum" value="{{ kurikulum }}">
+<input type="hidden" name="tingkat" value="{{ tingkat }}">
+<input type="hidden" name="q" value="{{ q }}">
+<input type="hidden" name="per" value="{{ per }}">
+<input type="hidden" name="urut" value="{{ urut }}">
+<input type="hidden" name="arah" value="{{ arah }}">
+{% if not kurikulum and not tingkat %}<input type="hidden" name="kosong" value="1">{% endif %}
+{% endmacro %}
+<div class="crumb">Data Mapping Rapor <span>›</span> Daftar</div>
+<div class="page-head">
+  <h1 class="page-title">Data Mapping Rapor</h1>
+  <a class="btn btn-amber" href="{{ url_for('main.form_mapping') }}">Buat mapping rapor</a>
 </div>
+<div class="card" style="padding:8px 16px 16px;overflow:auto">
+  <div class="toolbar">
+    <span></span>
+    <div class="icon-tools">
+      <form method="get">
+        <input type="hidden" name="kurikulum" value="{{ kurikulum }}">
+        <input type="hidden" name="tingkat" value="{{ tingkat }}">
+        <input type="hidden" name="urut" value="{{ urut }}">
+        <input type="hidden" name="arah" value="{{ arah }}">
+        <input type="hidden" name="per" value="{{ per }}">
+        {% if not kurikulum and not tingkat %}<input type="hidden" name="kosong" value="1">{% endif %}
+        <input class="search" name="q" value="{{ q }}" placeholder="Cari">
+      </form>
+      <details class="tool-pop">
+        <summary class="icon-btn" aria-label="Filter">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5h16l-6 7v6l-4 2v-8z"/></svg>
+          {% if saring %}<span class="count-dot">{{ saring }}</span>{% endif %}
+        </summary>
+        <form class="pop" method="get">
+          <input type="hidden" name="q" value="{{ q }}">
+          <input type="hidden" name="per" value="{{ per }}">
+          <label>Kurikulum Sekolah</label>
+          <select name="kurikulum">
+            <option value="">Semua</option>
+            {% for item in kurikulum_opsi %}
+            <option value="{{ item }}" {% if kurikulum==item %}selected{% endif %}>{{ item }}</option>
+            {% endfor %}
+          </select>
+          <label>Tingkat</label>
+          <select name="tingkat">
+            <option value="">Semua</option>
+            {% for item in tingkat_opsi %}
+            <option value="{{ item }}" {% if tingkat==item %}selected{% endif %}>{{ item }}</option>
+            {% endfor %}
+          </select>
+          <button class="btn btn-amber" type="submit">Terapkan</button>
+        </form>
+      </details>
+    </div>
+  </div>
+  {% if kurikulum or tingkat %}
+  <div class="filter-bar">
+    <span>Filter aktif</span>
+    {% if kurikulum %}
+    <span class="chip-filter">Kurikulum Sekolah: {{ kurikulum }}
+      <a href="{{ url_for('main.mapping_rapor', tingkat=tingkat, q=q, per=per, urut=urut, arah=arah, kosong=1 if not tingkat else none) }}" aria-label="Hapus filter kurikulum">×</a>
+    </span>
+    {% endif %}
+    {% if tingkat %}
+    <span class="chip-filter">Tingkat: {{ tingkat }}
+      <a href="{{ url_for('main.mapping_rapor', kurikulum=kurikulum, q=q, per=per, urut=urut, arah=arah, kosong=1 if not kurikulum else none) }}" aria-label="Hapus filter tingkat">×</a>
+    </span>
+    {% endif %}
+    <a class="filter-clear" href="{{ url_for('main.mapping_rapor', kosong=1) }}" aria-label="Hapus semua filter">×</a>
+  </div>
+  {% endif %}
+  <form id="hapus-mapping" method="post" action="{{ url_for('main.hapus_mapping') }}" onsubmit="return confirm('Hapus mapping yang dipilih?')">
+    {{ kunci() }}
+    <div class="bulk-bar" id="bulk-bar">
+      <span id="bulk-teks">0 dipilih</span>
+      <button class="btn btn-solid-danger btn-sm" type="submit">Hapus terpilih</button>
+    </div>
+  </form>
+  <table class="data">
+    <thead>
+      <tr>
+        <th><input type="checkbox" id="pilih-semua" aria-label="Pilih semua"></th>
+        <th>No</th>
+        <th><a class="sort" href="{{ url_for('main.mapping_rapor', kurikulum=kurikulum, tingkat=tingkat, q=q, per=per, urut='nama', arah='desc' if urut=='nama' and arah=='asc' else 'asc', kosong=1 if not kurikulum and not tingkat else none) }}">Nama Mapel</a></th>
+        <th>Nama Lokal</th>
+        <th>Kelompok</th>
+        <th>No Urut Rapor</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for r in rows %}
+      <tr>
+        <td><input class="pilih-siswa" type="checkbox" name="id" value="{{ r.id }}" form="hapus-mapping"></td>
+        <td>{{ awal + loop.index0 }}</td>
+        <td>{{ r.mapel_nama }}</td>
+        <td>
+          <form method="post" action="{{ url_for('main.ubah_mapping', item_id=r.id) }}">
+            {{ kunci() }}
+            <input class="cell-input" name="nama_lokal" value="{{ r.nama_lokal or '' }}" onchange="this.form.submit()">
+          </form>
+        </td>
+        <td>
+          <form method="post" action="{{ url_for('main.ubah_mapping', item_id=r.id) }}">
+            {{ kunci() }}
+            <select name="kelompok_id" onchange="this.form.submit()">
+              <option value="">Pilih salah satu opsi</option>
+              {% for k in kelompok %}
+              <option value="{{ k.id }}" {% if r.kelompok_id==k.id %}selected{% endif %}>{{ k.nama }}</option>
+              {% endfor %}
+            </select>
+          </form>
+        </td>
+        <td>
+          <form method="post" action="{{ url_for('main.ubah_mapping', item_id=r.id) }}">
+            {{ kunci() }}
+            <input class="cell-num" name="urutan" value="{{ r.urutan if r.urutan is not none else '' }}" onchange="this.form.submit()">
+          </form>
+        </td>
+      </tr>
+    {% else %}
+      <tr><td colspan="6" class="empty-state"><div class="empty-x">×</div>Tidak ada data yang ditemukan</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% if total %}
+  <div class="pager">
+    <span>Menampilkan {{ awal }} sampai {{ akhir }} dari {{ total }} hasil</span>
+    <form method="get" class="pager-form">
+      <input type="hidden" name="kurikulum" value="{{ kurikulum }}">
+      <input type="hidden" name="tingkat" value="{{ tingkat }}">
+      <input type="hidden" name="q" value="{{ q }}">
+      <input type="hidden" name="urut" value="{{ urut }}">
+      <input type="hidden" name="arah" value="{{ arah }}">
+      {% if not kurikulum and not tingkat %}<input type="hidden" name="kosong" value="1">{% endif %}
+      {% if halaman > 1 %}<a href="{{ url_for('main.mapping_rapor', kurikulum=kurikulum, tingkat=tingkat, q=q, urut=urut, arah=arah, per=per, halaman=halaman-1, kosong=1 if not kurikulum and not tingkat else none) }}">Sebelumnya</a>{% endif %}
+      {% if akhir < total %}<a href="{{ url_for('main.mapping_rapor', kurikulum=kurikulum, tingkat=tingkat, q=q, urut=urut, arah=arah, per=per, halaman=halaman+1, kosong=1 if not kurikulum and not tingkat else none) }}">Berikutnya</a>{% endif %}
+      <label>per halaman</label>
+      <select name="per" onchange="this.form.submit()">
+        {% for n in [10, 25, 50, 100] %}<option value="{{ n }}" {% if per == n %}selected{% endif %}>{{ n }}</option>{% endfor %}
+      </select>
+    </form>
+  </div>
+  {% endif %}
+</div>
+<script>
+var semua = document.getElementById("pilih-semua");
+function hitungPilih() {
+  var n = document.querySelectorAll(".pilih-siswa:checked").length;
+  var bar = document.getElementById("bulk-bar");
+  if (!bar) return;
+  bar.classList.toggle("on", n > 0);
+  document.getElementById("bulk-teks").textContent = n + " dipilih";
+}
+if (semua) {
+  semua.addEventListener("change", function () {
+    document.querySelectorAll(".pilih-siswa").forEach(function (kotak) { kotak.checked = semua.checked; });
+    hitungPilih();
+  });
+  document.querySelectorAll(".pilih-siswa").forEach(function (kotak) {
+    kotak.addEventListener("change", hitungPilih);
+  });
+}
+</script>
 {% endblock %}

@@ -167,6 +167,8 @@ def ensure_guru_columns():
         execute("ALTER TABLE guru ADD COLUMN jumlah_jam INT NULL")
     if "mengajar_di" not in cols:
         execute("ALTER TABLE guru ADD COLUMN mengajar_di TEXT NULL")
+    if "nbm" not in cols:
+        execute("ALTER TABLE guru ADD COLUMN nbm VARCHAR(30) NULL")
     execute("ALTER TABLE guru MODIFY jenis_kelamin ENUM('L','P') NULL")
     execute("ALTER TABLE guru MODIFY gelar_belakang VARCHAR(80) DEFAULT ''")
 

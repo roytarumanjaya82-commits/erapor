@@ -1,29 +1,37 @@
 {% extends "base.html" %}
 {% block title %}Data Guru{% endblock %}
 {% block content %}
-<h1 class="page-title">Data Guru</h1>
+<div class="crumb">Data Guru <span>›</span> Daftar</div>
+<div class="page-head">
+  <h1 class="page-title">Data Guru</h1>
+  <a class="btn btn-amber" href="{{ url_for('main.form_guru') }}">Buat guru</a>
+</div>
 <div class="toolbar">
-  <form method="get"><input class="search" name="q" value="{{ q }}" placeholder="Cari nama / mapel / NIP"></form>
+  <form method="get"><input class="search" name="q" value="{{ q }}" placeholder="Cari nama, NUPTK, atau NBM / NIP"></form>
   <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
     <form method="post" action="{{ url_for('main.upload_guru') }}" enctype="multipart/form-data" style="display:flex;gap:8px;align-items:center" onsubmit="return confirm('Daftar guru akan diganti sesuai file Excel. Guru lama yang tidak ada di file akan dihapus. Lanjutkan?')">
       <input class="search" type="file" name="berkas" accept=".xls,.xlsx" required>
       <button class="btn btn-primary" type="submit">Upload data guru</button>
     </form>
-    <a class="btn btn-ghost" href="{{ url_for('main.form_guru') }}">+ Tambah guru</a>
   </div>
 </div>
 <div class="card" style="padding:8px 16px 16px">
   <table class="data">
-    <thead><tr><th>Nama</th><th>Mata pelajaran</th><th>Jam</th><th>Mengajar di kelas</th><th></th></tr></thead>
+    <thead><tr><th>Nama & Gelar Guru</th><th>JK</th><th>NUPTK</th><th>NBM / NIP</th><th>Mata pelajaran</th><th></th></tr></thead>
     <tbody>
     {% for r in rows %}
       <tr>
-        <td>{{ r.nama }}{% if r.gelar_belakang %}, {{ r.gelar_belakang }}{% endif %}</td>
+        <td>{{ r.gelar_depan ~ ' ' if r.gelar_depan else '' }}{{ r.nama }}{% if r.gelar_belakang %}, {{ r.gelar_belakang }}{% endif %}</td>
+        <td>
+          {% if r.jenis_kelamin=='L' %}<span class="jk laki">Laki-laki</span>
+          {% elif r.jenis_kelamin=='P' %}<span class="jk perempuan">Perempuan</span>
+          {% else %}-{% endif %}
+        </td>
+        <td>{{ r.nuptk or '-' }}</td>
+        <td>{{ r.nbm or r.nip or '-' }}</td>
         <td>{{ r.mapel_ajar or '-' }}</td>
-        <td>{{ r.jumlah_jam if r.jumlah_jam is not none else '-' }}</td>
-        <td>{{ r.mengajar_di or '-' }}</td>
         <td class="actions">
-          <a class="btn btn-ghost btn-sm" href="{{ url_for('main.form_guru', item_id=r.id) }}">Ubah</a>
+          <a class="btn-ubah" href="{{ url_for('main.form_guru', item_id=r.id) }}">Ubah</a>
           <form method="post" action="{{ url_for('main.hapus_guru', item_id=r.id) }}" onsubmit="return confirm('Hapus guru ini?')">
             <button class="btn btn-danger btn-sm" type="submit">Hapus</button>
           </form>

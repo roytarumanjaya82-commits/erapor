@@ -21,18 +21,45 @@ ENDPOINT_TUGAS = {
     "main.data_pelajaran": {"admin", "bidang_studi"},
     "main.form_pelajaran": {"admin"},
     "main.hapus_pelajaran": {"admin"},
+    "main.hapus_pelajaran_terpilih": {"admin"},
     "main.data_siswa": {"admin", "walas"},
     "main.form_siswa": {"admin"},
     "main.hapus_siswa": {"admin"},
+    "main.hapus_siswa_terpilih": {"admin"},
     "main.data_ekskul": {"admin", "ekskul"},
+    "main.form_ekskul": {"admin"},
     "main.hapus_ekskul": {"admin"},
+    "main.hapus_ekskul_terpilih": {"admin"},
+    "main.peserta_ekskul": {"admin", "ekskul"},
     "main.nilai_tahfiz": {"admin", "tahfidz"},
     "main.simpan_nilai_tahfiz": {"admin", "tahfidz"},
     "main.aspek_tahfiz": {"admin", "tahfidz"},
+    "main.form_aspek": {"admin"},
     "main.hapus_aspek": {"admin"},
+    "main.hapus_aspek_terpilih": {"admin"},
     "main.mapping_tahfiz": {"admin"},
+    "main.form_mapping_tahfiz": {"admin"},
     "main.hapus_mapping_tahfiz": {"admin"},
+    "main.hapus_mapping_tahfiz_terpilih": {"admin"},
     "main.pengaturan_tahfiz": {"admin"},
+    "main.data_kelompok": {"admin"},
+    "main.form_kelompok": {"admin"},
+    "main.hapus_kelompok": {"admin"},
+    "main.hapus_kelompok_terpilih": {"admin"},
+    "main.mapping_rapor": {"admin"},
+    "main.form_mapping": {"admin"},
+    "main.ubah_mapping": {"admin"},
+    "main.hapus_mapping": {"admin"},
+    "main.gabung_mapel": {"admin"},
+    "main.form_gabung": {"admin"},
+    "main.hapus_gabung": {"admin"},
+    "main.data_mapel": {"admin"},
+    "main.form_mapel": {"admin"},
+    "main.hapus_mapel": {"admin"},
+    "main.hapus_mapel_terpilih": {"admin"},
+    "main.data_sekolah": {"admin"},
+    "main.form_sekolah": {"admin"},
+    "main.hapus_sekolah": {"admin"},
 }
 
 _ready = False
@@ -53,12 +80,14 @@ def ensure_access():
     execute(
         """CREATE TABLE IF NOT EXISTS dimensi_sikap (
             id INT PRIMARY KEY AUTO_INCREMENT,
+            kode VARCHAR(60) NULL,
             nama VARCHAR(150) NOT NULL,
             indikator TEXT,
             kelas_7 TINYINT DEFAULT 1,
             kelas_8 TINYINT DEFAULT 1,
             kelas_9 TINYINT DEFAULT 1,
-            urutan INT DEFAULT 0
+            urutan INT DEFAULT 0,
+            UNIQUE KEY uk_dimensi_kode (kode)
         )"""
     )
     execute(
@@ -83,6 +112,148 @@ def ensure_access():
         execute("ALTER TABLE users MODIFY role ENUM('admin','guru','wali_kelas','siswa') NOT NULL DEFAULT 'guru'")
     except Exception:
         pass
+    kolom = {row["Field"] for row in query("SHOW COLUMNS FROM users")}
+    tambahan = {
+        "email": "ALTER TABLE users ADD COLUMN email VARCHAR(150) NULL",
+        "aktif": "ALTER TABLE users ADD COLUMN aktif TINYINT NOT NULL DEFAULT 1",
+        "login_terakhir": "ALTER TABLE users ADD COLUMN login_terakhir DATETIME NULL",
+        "ip_address": "ALTER TABLE users ADD COLUMN ip_address VARCHAR(45) NULL",
+        "sedang_login": "ALTER TABLE users ADD COLUMN sedang_login TINYINT NOT NULL DEFAULT 0",
+    }
+    for nama, sql in tambahan.items():
+        if nama not in kolom:
+            execute(sql)
+    kolom_sekolah = {row["Field"] for row in query("SHOW COLUMNS FROM sekolah")}
+    tambahan_sekolah = {
+        "status_sekolah": "ALTER TABLE sekolah ADD COLUMN status_sekolah VARCHAR(30) NULL",
+        "tempat_rapor": "ALTER TABLE sekolah ADD COLUMN tempat_rapor VARCHAR(100) NULL",
+        "tanggal_rapor": "ALTER TABLE sekolah ADD COLUMN tanggal_rapor DATE NULL",
+    }
+    for nama, sql in tambahan_sekolah.items():
+        if nama not in kolom_sekolah:
+            execute(sql)
+    kolom_siswa = {row["Field"] for row in query("SHOW COLUMNS FROM siswa")}
+    if "nik" not in kolom_siswa:
+        execute("ALTER TABLE siswa ADD COLUMN nik VARCHAR(20) NULL")
+    try:
+        execute("ALTER TABLE siswa MODIFY jenis_kelamin ENUM('L','P') NULL")
+    except Exception:
+        pass
+    kolom_pelajaran = {row["Field"] for row in query("SHOW COLUMNS FROM pelajaran")}
+    if "kode" not in kolom_pelajaran:
+        execute("ALTER TABLE pelajaran ADD COLUMN kode VARCHAR(36) NULL")
+    if "status_kurikulum" not in kolom_pelajaran:
+        execute("ALTER TABLE pelajaran ADD COLUMN status_kurikulum VARCHAR(30) NULL")
+    try:
+        execute("ALTER TABLE pelajaran MODIFY guru_id INT NULL")
+        execute("ALTER TABLE pelajaran MODIFY jam_per_minggu INT NULL")
+    except Exception:
+        pass
+    execute("UPDATE pelajaran SET kode=LOWER(UUID()) WHERE kode IS NULL OR kode=''")
+    try:
+        execute("ALTER TABLE kelompok_mapel MODIFY kode VARCHAR(60) NOT NULL")
+    except Exception:
+        pass
+    execute(
+        "UPDATE kelompok_mapel SET nama=%s WHERE kode='C' AND nama=%s",
+        ("Kelompok C (Pilihan / Peminatan)", "Kelompok C (Peminatan)"),
+    )
+    execute(
+        "UPDATE kelompok_mapel SET kode=%s WHERE kode='M' AND nama='Muatan Lokal'",
+        ("Muatan Lokal",),
+    )
+    kolom_ekskul = {row["Field"] for row in query("SHOW COLUMNS FROM ekstrakurikuler")}
+    if "nama_pembina" not in kolom_ekskul:
+        execute("ALTER TABLE ekstrakurikuler ADD COLUMN nama_pembina VARCHAR(150) NULL")
+    execute(
+        """UPDATE ekstrakurikuler e
+           JOIN guru g ON g.id=e.pembina_id
+           SET e.nama_pembina=TRIM(CONCAT(
+             IF(g.gelar_depan IS NULL OR g.gelar_depan='', '', CONCAT(g.gelar_depan, ' ')),
+             g.nama,
+             IF(g.gelar_belakang IS NULL OR g.gelar_belakang='', '', CONCAT(', ', g.gelar_belakang))
+           ))
+           WHERE e.nama_pembina IS NULL OR e.nama_pembina=''"""
+    )
+    execute(
+        """CREATE TABLE IF NOT EXISTS peserta_ekskul (
+            id INT PRIMARY KEY AUTO_INCREMENT,
+            ekskul_id INT NOT NULL,
+            siswa_id INT NOT NULL,
+            UNIQUE KEY uk_peserta_ekskul (ekskul_id, siswa_id),
+            CONSTRAINT fk_peserta_ekskul FOREIGN KEY (ekskul_id) REFERENCES ekstrakurikuler(id) ON DELETE CASCADE,
+            CONSTRAINT fk_peserta_siswa FOREIGN KEY (siswa_id) REFERENCES siswa(id) ON DELETE CASCADE
+        )"""
+    )
+    kolom_mapping = {row["Field"] for row in query("SHOW COLUMNS FROM mapping_rapor")}
+    tambahan_mapping = {
+        "kurikulum": "ALTER TABLE mapping_rapor ADD COLUMN kurikulum VARCHAR(80) NULL",
+        "tingkat": "ALTER TABLE mapping_rapor ADD COLUMN tingkat VARCHAR(10) NULL",
+        "nama_lokal": "ALTER TABLE mapping_rapor ADD COLUMN nama_lokal VARCHAR(150) NULL",
+        "kelompok_id": "ALTER TABLE mapping_rapor ADD COLUMN kelompok_id INT NULL",
+    }
+    for nama, sql in tambahan_mapping.items():
+        if nama not in kolom_mapping:
+            execute(sql)
+    execute(
+        """UPDATE mapping_rapor mr
+           JOIN mata_pelajaran m ON m.id=mr.mapel_id
+           SET mr.nama_lokal=m.nama
+           WHERE mr.nama_lokal IS NULL OR mr.nama_lokal=''"""
+    )
+    execute(
+        """UPDATE mapping_rapor mr
+           JOIN mata_pelajaran m ON m.id=mr.mapel_id
+           SET mr.kelompok_id=m.kelompok_id
+           WHERE mr.kelompok_id IS NULL"""
+    )
+    execute(
+        "UPDATE mapping_rapor SET kurikulum='Kurikulum Merdeka' WHERE kurikulum IS NULL OR kurikulum=''"
+    )
+    tanpa_tingkat = query(
+        "SELECT id, mapel_id, tampil_rapor, urutan, kurikulum, nama_lokal, kelompok_id FROM mapping_rapor WHERE tingkat IS NULL OR tingkat=''"
+    )
+    for baris in tanpa_tingkat:
+        execute("UPDATE mapping_rapor SET tingkat='7' WHERE id=%s", (baris["id"],))
+        for tingkat in ("8", "9"):
+            ada = query(
+                "SELECT id FROM mapping_rapor WHERE mapel_id=%s AND tingkat=%s AND kurikulum=%s",
+                (baris["mapel_id"], tingkat, baris["kurikulum"]),
+                one=True,
+            )
+            if ada:
+                continue
+            execute(
+                """INSERT INTO mapping_rapor
+                   (mapel_id, tampil_rapor, urutan, kurikulum, tingkat, nama_lokal, kelompok_id)
+                   VALUES (%s,%s,%s,%s,%s,%s,%s)""",
+                (
+                    baris["mapel_id"],
+                    baris["tampil_rapor"],
+                    baris["urutan"],
+                    baris["kurikulum"],
+                    tingkat,
+                    baris["nama_lokal"],
+                    baris["kelompok_id"],
+                ),
+            )
+    indeks_mapping = {row["Key_name"] for row in query("SHOW INDEX FROM mapping_rapor")}
+    if "uk_mapping_rapor" not in indeks_mapping:
+        try:
+            execute(
+                "ALTER TABLE mapping_rapor ADD UNIQUE KEY uk_mapping_rapor (kurikulum, tingkat, mapel_id)"
+            )
+        except Exception:
+            pass
+    indeks = {row["Key_name"] for row in query("SHOW INDEX FROM pelajaran")}
+    if "uk_pelajaran_kode" not in indeks:
+        try:
+            execute("ALTER TABLE pelajaran ADD UNIQUE KEY uk_pelajaran_kode (kode)")
+        except Exception:
+            pass
+    kolom_dimensi = {row["Field"] for row in query("SHOW COLUMNS FROM dimensi_sikap")}
+    if "kode" not in kolom_dimensi:
+        execute("ALTER TABLE dimensi_sikap ADD COLUMN kode VARCHAR(60) NULL")
     if not query("SELECT id FROM dimensi_sikap LIMIT 1", one=True):
         for i, (nama, indikator) in enumerate(
             [
@@ -97,6 +268,13 @@ def ensure_access():
                 "INSERT INTO dimensi_sikap (nama, indikator, urutan) VALUES (%s,%s,%s)",
                 (nama, indikator, i),
             )
+    _isi_kode_dimensi()
+    indeks_dimensi = {row["Key_name"] for row in query("SHOW INDEX FROM dimensi_sikap")}
+    if "uk_dimensi_kode" not in indeks_dimensi:
+        try:
+            execute("ALTER TABLE dimensi_sikap ADD UNIQUE KEY uk_dimensi_kode (kode)")
+        except Exception:
+            pass
     if not query("SELECT id FROM predikat_sikap LIMIT 1", one=True):
         for i, (nama, deskripsi) in enumerate(
             [
@@ -110,8 +288,70 @@ def ensure_access():
                 "INSERT INTO predikat_sikap (nama, deskripsi, urutan) VALUES (%s,%s,%s)",
                 (nama, deskripsi, i),
             )
+    _siapkan_aspek()
+    _siapkan_mapping_tahfiz()
+    _siapkan_pengaturan_tahfiz()
     _seed_demo_users()
     _ready = True
+
+
+def _siapkan_pengaturan_tahfiz():
+    kolom = {row["Field"] for row in query("SHOW COLUMNS FROM pengaturan_rapor_tahfiz")}
+    tambah = {
+        "tanggal_hijriah": "VARCHAR(80) NULL",
+        "tanggal_masehi": "VARCHAR(80) NULL",
+        "tempat_cetak": "VARCHAR(120) NULL",
+        "nama_kepala": "VARCHAR(150) NULL",
+        "nbm_kepala": "VARCHAR(40) NULL",
+    }
+    for nama, tipe in tambah.items():
+        if nama not in kolom:
+            execute(f"ALTER TABLE pengaturan_rapor_tahfiz ADD COLUMN {nama} {tipe}")
+
+
+def _siapkan_mapping_tahfiz():
+    kolom = {row["Field"] for row in query("SHOW COLUMNS FROM mapping_guru_tahfiz")}
+    if "dibuat" not in kolom:
+        execute("ALTER TABLE mapping_guru_tahfiz ADD COLUMN dibuat DATETIME NULL")
+    execute("UPDATE mapping_guru_tahfiz SET dibuat=NOW() WHERE dibuat IS NULL")
+
+
+def _siapkan_aspek():
+    kolom = {row["Field"] for row in query("SHOW COLUMNS FROM aspek_tahfiz")}
+    if "urutan" not in kolom:
+        execute("ALTER TABLE aspek_tahfiz ADD COLUMN urutan INT NULL")
+    if "aktif" not in kolom:
+        execute("ALTER TABLE aspek_tahfiz ADD COLUMN aktif TINYINT NOT NULL DEFAULT 1")
+    if "dibuat" not in kolom:
+        execute("ALTER TABLE aspek_tahfiz ADD COLUMN dibuat DATETIME NULL")
+    baris = query("SELECT id, urutan FROM aspek_tahfiz ORDER BY id")
+    for nomor, row in enumerate(baris, start=1):
+        if row["urutan"] is None:
+            execute("UPDATE aspek_tahfiz SET urutan=%s WHERE id=%s", (nomor, row["id"]))
+    execute("UPDATE aspek_tahfiz SET aktif=1 WHERE aktif IS NULL")
+    execute("UPDATE aspek_tahfiz SET dibuat=NOW() WHERE dibuat IS NULL")
+
+
+def _isi_kode_dimensi():
+    baris = query("SELECT id, nama, kode FROM dimensi_sikap ORDER BY id")
+    terpakai = {row["kode"] for row in baris if row.get("kode")}
+    for row in baris:
+        if row.get("kode"):
+            continue
+        dasar = []
+        for ch in (row["nama"] or "").lower():
+            if ch.isalnum():
+                dasar.append(ch)
+            elif dasar and dasar[-1] != "-":
+                dasar.append("-")
+        kode = "".join(dasar).strip("-").split("-")[0][:40] or "dimensi"
+        calon = kode
+        n = 2
+        while calon in terpakai:
+            calon = f"{kode}{n}"
+            n += 1
+        terpakai.add(calon)
+        execute("UPDATE dimensi_sikap SET kode=%s WHERE id=%s AND (kode IS NULL OR kode='')", (calon, row["id"]))
 
 
 def _guru_id(nama):

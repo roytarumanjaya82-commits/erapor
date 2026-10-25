@@ -7,6 +7,7 @@ from .db import init_app, query
 def create_app():
     app = Flask(__name__, template_folder="../templates", static_folder="../static")
     app.config.from_object(Config)
+    app.config["MAX_CONTENT_LENGTH"] = 100 * 1024 * 1024
     init_app(app)
 
     from .access import TUGAS_LABEL, guard_request, load_tugas
@@ -60,6 +61,11 @@ def create_app():
         flash("Format data tidak valid. Periksa angka, tanggal, dan panjang isian.", "error")
         return _back()
 
+    @app.errorhandler(413)
+    def handle_large(_e):
+        flash("Ukuran file maksimal 100MB.", "error")
+        return _back()
+
     @app.errorhandler(InputError)
     def handle_value(_e):
         flash("Ada nilai yang bukan angka antara 0 dan 100.", "error")
@@ -72,5 +78,25 @@ def create_app():
         if hasattr(value, "strftime"):
             return value.strftime("%Y-%m-%d")
         return str(value)[:10]
+
+    @app.template_filter("iddate")
+    def id_date(value):
+        bulan = (
+            "", "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+            "Juli", "Agustus", "September", "Oktober", "November", "Desember",
+        )
+        if not value or not hasattr(value, "day"):
+            return ""
+        return f"{value.day} {bulan[value.month]} {value.year}"
+
+    @app.template_filter("idstamp")
+    def id_stamp(value):
+        singkat = (
+            "", "Jan", "Feb", "Mar", "Apr", "Mei", "Jun",
+            "Jul", "Agu", "Sep", "Okt", "Nov", "Des",
+        )
+        if not value or not hasattr(value, "day"):
+            return ""
+        return f"{value.day:02d} {singkat[value.month]} {value.year} {value.strftime('%H:%M')}"
 
     return app

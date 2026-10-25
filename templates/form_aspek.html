@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}{% if row.id %}Ubah Tahfiz Aspek{% else %}Buat Tahfiz Aspek{% endif %}{% endblock %}
+{% block content_class %}content-wide{% endblock %}
+{% block content %}
+<div class="crumb">Aspek / Mapel Tahfiz <span>›</span> {% if row.id %}Ubah{% else %}Buat{% endif %}</div>
+<div class="page-head">
+  <h1 class="page-title">{% if row.id %}Ubah Tahfiz Aspek{% else %}Buat Tahfiz Aspek{% endif %}</h1>
+  {% if row.id %}
+  <button class="btn btn-solid-danger" type="button" onclick="document.getElementById('hapus-aspek').classList.add('open')">Hapus</button>
+  {% endif %}
+</div>
+<form method="post">
+  <div class="form-grid">
+    <div>
+      <label>Nama Aspek / Mata Pelajaran Tahfiz<span class="wajib">*</span></label>
+      <input type="text" name="nama" value="{{ row.nama or '' }}" placeholder="Contoh: Ziyadah (Tambahan), Tajwid" required>
+    </div>
+    <div>
+      <label>Urutan Tampilan<span class="wajib">*</span></label>
+      <input type="number" name="urutan" value="{{ row.urutan|default(1, true) }}" required>
+    </div>
+    <div class="full">
+      <label class="tingkat-item">
+        <input class="saklar" type="checkbox" name="aktif" {% if not row.id or row.aktif %}checked{% endif %}>
+        <span>Status Aktif</span>
+      </label>
+    </div>
+  </div>
+  <div class="form-actions">
+    <button class="btn btn-amber" name="aksi" value="simpan" type="submit">{% if row.id %}Simpan{% else %}Buat{% endif %}</button>
+    {% if not row.id %}<button class="btn btn-ghost" name="aksi" value="lagi" type="submit">Buat & buat lainnya</button>{% endif %}
+    <a class="btn btn-ghost" href="{{ url_for('main.aspek_tahfiz') }}">Batal</a>
+  </div>
+</form>
+{% if row.id %}
+<div class="modal-back" id="hapus-aspek" onclick="if (event.target === this) this.classList.remove('open')">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="judul-hapus-aspek">
+    <button class="modal-x" type="button" onclick="document.getElementById('hapus-aspek').classList.remove('open')" aria-label="Tutup">×</button>
+    <div class="modal-icon" aria-hidden="true">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M9 7V5h6v2M8 7l1 13h6l1-13"/></svg>
+    </div>
+    <h3 id="judul-hapus-aspek">Hapus Tahfiz Aspek</h3>
+    <p>Apakah Anda yakin ingin melakukan ini?</p>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" type="button" onclick="document.getElementById('hapus-aspek').classList.remove('open')">Batal</button>
+      <form method="post" action="{{ url_for('main.hapus_aspek', item_id=row.id) }}">
+        <button class="btn btn-solid-danger" type="submit">Hapus</button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

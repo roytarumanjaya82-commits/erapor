@@ -34,6 +34,15 @@ PREPARE stmt_kelas FROM @sql_kelas;
 EXECUTE stmt_kelas;
 DEALLOCATE PREPARE stmt_kelas;
 
+SET @ada_nbm := (
+  SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'guru' AND COLUMN_NAME = 'nbm'
+);
+SET @sql_nbm := IF(@ada_nbm = 0, 'ALTER TABLE guru ADD COLUMN nbm VARCHAR(30) NULL', 'SELECT 1');
+PREPARE stmt_nbm FROM @sql_nbm;
+EXECUTE stmt_nbm;
+DEALLOCATE PREPARE stmt_nbm;
+
 DELETE FROM guru;
 
 INSERT INTO guru (nama, gelar_depan, gelar_belakang, jenis_kelamin, status_kepegawaian, mapel_ajar, jumlah_jam, mengajar_di, aktif) VALUES

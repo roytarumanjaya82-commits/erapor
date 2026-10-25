@@ -1,28 +1,85 @@
 {% extends "base.html" %}
-{% block title %}Kelompok Mapel{% endblock %}
+{% block title %}Data Kelompok Mapel{% endblock %}
+{% block content_class %}content-wide{% endblock %}
 {% block content %}
-<h1 class="page-title">Data Kelompok Mapel</h1>
-<div class="card">
-  <form method="post" class="form-grid" style="margin-bottom:18px">
-    <div><label>Kode</label><input type="text" name="kode" required></div>
-    <div><label>Nama</label><input type="text" name="nama" required></div>
-    <div><label>Urutan</label><input type="number" name="urutan" value="0"></div>
-    <div style="display:flex;align-items:end"><button class="btn btn-primary">Tambah</button></div>
-  </form>
-  <table class="data">
-    <thead><tr><th>Kode</th><th>Nama</th><th>Urutan</th><th></th></tr></thead>
-    <tbody>
-    {% for r in rows %}
-      <tr>
-        <td>{{ r.kode }}</td><td>{{ r.nama }}</td><td>{{ r.urutan }}</td>
-        <td>
-          <form method="post" action="{{ url_for('main.hapus_kelompok', item_id=r.id) }}" onsubmit="return confirm('Hapus?')">
-            <button class="btn btn-danger btn-sm">Hapus</button>
-          </form>
-        </td>
-      </tr>
-    {% endfor %}
-    </tbody>
-  </table>
+<div class="crumb">Data Kelompok Mapel <span>›</span> Daftar</div>
+<div class="page-head">
+  <h1 class="page-title">Data Kelompok Mapel</h1>
+  <a class="btn btn-amber" href="{{ url_for('main.form_kelompok') }}">Buat kelompok mapel</a>
 </div>
+<div class="card" style="padding:8px 16px 16px;overflow:auto">
+  <div class="toolbar">
+    <span></span>
+    <form method="get">
+      <input type="hidden" name="urut" value="{{ urut }}">
+      <input type="hidden" name="arah" value="{{ arah }}">
+      <input type="hidden" name="per" value="{{ per }}">
+      <input class="search" name="q" value="{{ q }}" placeholder="Cari">
+    </form>
+  </div>
+  <form method="post" action="{{ url_for('main.hapus_kelompok_terpilih') }}" onsubmit="return confirm('Hapus kelompok yang dipilih?')">
+    <div class="bulk-bar" id="bulk-bar">
+      <span id="bulk-teks">0 dipilih</span>
+      <button class="btn btn-solid-danger btn-sm" type="submit">Hapus terpilih</button>
+    </div>
+    <table class="data">
+      <thead>
+        <tr>
+          <th><input type="checkbox" id="pilih-semua" aria-label="Pilih semua"></th>
+          <th><a class="sort" href="{{ url_for('main.data_kelompok', q=q, per=per, urut='kode', arah='desc' if urut=='kode' and arah=='asc' else 'asc') }}">Kelompok</a></th>
+          <th><a class="sort" href="{{ url_for('main.data_kelompok', q=q, per=per, urut='nama', arah='desc' if urut=='nama' and arah=='asc' else 'asc') }}">Nama Kelompok</a></th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for r in rows %}
+        <tr>
+          <td><input class="pilih-siswa" type="checkbox" name="id" value="{{ r.id }}"></td>
+          <td>{{ r.kode }}</td>
+          <td>{{ r.nama }}</td>
+          <td class="actions"><a class="btn-ubah" href="{{ url_for('main.form_kelompok', item_id=r.id) }}">Ubah</a></td>
+        </tr>
+      {% else %}
+        <tr><td colspan="4">Belum ada kelompok mapel.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </form>
+  <div class="pager">
+    <span>
+      {% if total == 0 %}Belum ada hasil
+      {% else %}Menampilkan {{ awal }} sampai {{ akhir }} dari {{ total }} hasil{% endif %}
+    </span>
+    <form method="get" class="pager-form">
+      <input type="hidden" name="q" value="{{ q }}">
+      <input type="hidden" name="urut" value="{{ urut }}">
+      <input type="hidden" name="arah" value="{{ arah }}">
+      {% if halaman > 1 %}<a href="{{ url_for('main.data_kelompok', q=q, urut=urut, arah=arah, per=per, halaman=halaman-1) }}">Sebelumnya</a>{% endif %}
+      {% if akhir < total %}<a href="{{ url_for('main.data_kelompok', q=q, urut=urut, arah=arah, per=per, halaman=halaman+1) }}">Berikutnya</a>{% endif %}
+      <label>per halaman</label>
+      <select name="per" onchange="this.form.submit()">
+        {% for n in [10, 25, 50, 100] %}<option value="{{ n }}" {% if per == n %}selected{% endif %}>{{ n }}</option>{% endfor %}
+      </select>
+    </form>
+  </div>
+</div>
+<script>
+var semua = document.getElementById("pilih-semua");
+function hitungPilih() {
+  var n = document.querySelectorAll(".pilih-siswa:checked").length;
+  var bar = document.getElementById("bulk-bar");
+  if (!bar) return;
+  bar.classList.toggle("on", n > 0);
+  document.getElementById("bulk-teks").textContent = n + " dipilih";
+}
+if (semua) {
+  semua.addEventListener("change", function () {
+    document.querySelectorAll(".pilih-siswa").forEach(function (kotak) { kotak.checked = semua.checked; });
+    hitungPilih();
+  });
+  document.querySelectorAll(".pilih-siswa").forEach(function (kotak) {
+    kotak.addEventListener("change", hitungPilih);
+  });
+}
+</script>
 {% endblock %}

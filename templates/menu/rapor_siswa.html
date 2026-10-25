@@ -43,7 +43,11 @@
   <div class="ttd">
     <div>Orang tua / wali siswa<br><br><br>....................</div>
     <div>Wali kelas<br><br><br>{{ siswa.wali or '-' }}{% if siswa.gelar_belakang %}, {{ siswa.gelar_belakang }}{% endif %}</div>
-    <div>Kepala sekolah<br><br><br>{{ sekolah.kepala_sekolah or '-' }}</div>
+    <div>
+      {% if sekolah.tempat_rapor or sekolah.tanggal_rapor %}{{ sekolah.tempat_rapor or sekolah.kabupaten or '' }}{% if sekolah.tanggal_rapor %}, {{ sekolah.tanggal_rapor|iddate }}{% endif %}<br>{% endif %}
+      Kepala sekolah<br><br><br>{{ sekolah.kepala_sekolah or '-' }}
+      {% if sekolah.nip_kepala %}<br>NBM/NIP. {{ sekolah.nip_kepala }}{% endif %}
+    </div>
   </div>
 </body>
 </html>

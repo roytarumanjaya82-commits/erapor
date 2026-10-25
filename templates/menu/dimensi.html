@@ -1,34 +1,172 @@
 {% extends "base.html" %}
-{% block title %}Dimensi Sikap{% endblock %}
+{% block title %}Dimensi Sikap (Profil Lulusan){% endblock %}
+{% block content_class %}content-wide{% endblock %}
 {% block content %}
-<h1 class="page-title">Dimensi Sikap</h1>
-{% if 'admin' in tugas %}
-<div class="card">
-  <form method="post" class="form-grid">
-    <div><label>Nama dimensi</label><input name="nama" required></div>
-    <div><label>Urutan</label><input type="number" name="urutan" value="0"></div>
-    <div class="full"><label>Indikator</label><textarea name="indikator"></textarea></div>
-    <div class="full">
-      <label class="check"><input type="checkbox" name="kelas_7" checked> Kelas 7</label>
-      <label class="check"><input type="checkbox" name="kelas_8" checked> Kelas 8</label>
-      <label class="check"><input type="checkbox" name="kelas_9" checked> Kelas 9</label>
-    </div>
-    <div><button class="btn btn-primary">Tambah</button></div>
-  </form>
+{% set admin = 'admin' in tugas %}
+<div class="crumb">Dimensi Sikap (Profil Lulusan) <span>›</span> Daftar</div>
+<div class="page-head">
+  <h1 class="page-title">Dimensi Sikap (Profil Lulusan)</h1>
+  {% if admin %}<button class="btn btn-amber" type="button" onclick="bukaBaru()">Tambah Dimensi Sikap</button>{% endif %}
 </div>
-{% endif %}
-<div class="card" style="padding:8px 16px 16px">
+<div class="card" style="padding:8px 16px 16px;overflow:auto">
+  <div class="toolbar">
+    <span></span>
+    <form method="get">
+      <input type="hidden" name="urut" value="{{ urut }}">
+      <input type="hidden" name="arah" value="{{ arah }}">
+      <input type="hidden" name="per" value="{{ per }}">
+      <input class="search" name="q" value="{{ q }}" placeholder="Cari">
+    </form>
+  </div>
   <table class="data">
-    <thead><tr><th>No</th><th>Dimensi</th><th>Indikator</th><th>7</th><th>8</th><th>9</th><th></th></tr></thead>
+    <thead>
+      <tr>
+        <th><a class="sort" href="{{ url_for('menu.dimensi', q=q, per=per, urut='urutan', arah='desc' if urut=='urutan' and arah=='asc' else 'asc') }}">No</a></th>
+        <th>Dimensi Profil Lulusan</th>
+        <th>Indikator Sikap yang Diamati</th>
+        <th>Kelas 7</th>
+        <th>Kelas 8</th>
+        <th>Kelas 9</th>
+        {% if admin %}<th></th>{% endif %}
+      </tr>
+    </thead>
     <tbody>
     {% for r in rows %}
       <tr>
-        <td>{{ r.urutan }}</td><td>{{ r.nama }}</td><td>{{ r.indikator }}</td>
-        <td>{{ 'Ya' if r.kelas_7 else '-' }}</td><td>{{ 'Ya' if r.kelas_8 else '-' }}</td><td>{{ 'Ya' if r.kelas_9 else '-' }}</td>
-        <td>{% if 'admin' in tugas %}<form method="post" action="{{ url_for('menu.hapus_dimensi', item_id=r.id) }}"><button class="btn btn-danger btn-sm">Hapus</button></form>{% endif %}</td>
+        <td>{{ r.urutan }}</td>
+        <td class="nama-tebal">{{ r.nama }}</td>
+        <td>{{ r.indikator }}</td>
+        {% for bidang in ['kelas_7', 'kelas_8', 'kelas_9'] %}
+        <td>
+          {% if admin %}
+          <form method="post" action="{{ url_for('menu.toggle_dimensi', item_id=r.id) }}">
+            <input type="hidden" name="bidang" value="{{ bidang }}">
+            <input type="hidden" name="q" value="{{ q }}">
+            <input type="hidden" name="urut" value="{{ urut }}">
+            <input type="hidden" name="arah" value="{{ arah }}">
+            <input type="hidden" name="per" value="{{ per }}">
+            <input type="hidden" name="halaman" value="{{ halaman }}">
+            <input class="saklar" type="checkbox" name="nyala" value="1" {% if r[bidang] %}checked{% endif %} onchange="this.form.submit()" aria-label="{{ bidang }}">
+          </form>
+          {% else %}
+          <input class="saklar" type="checkbox" {% if r[bidang] %}checked{% endif %} disabled aria-label="{{ bidang }}">
+          {% endif %}
+        </td>
+        {% endfor %}
+        {% if admin %}
+        <td class="actions">
+          <button class="btn-ubah" type="button" onclick="bukaUbah({{ r.id }})">Ubah</button>
+          <form method="post" action="{{ url_for('menu.hapus_dimensi', item_id=r.id) }}" onsubmit="return confirm('Hapus dimensi sikap ini?')">
+            <button class="btn-hapus" type="submit">Hapus</button>
+          </form>
+        </td>
+        {% endif %}
       </tr>
+    {% else %}
+      <tr><td colspan="{{ 7 if admin else 6 }}" class="empty-state"><div class="empty-x">×</div>Tidak ada data yang ditemukan</td></tr>
     {% endfor %}
     </tbody>
   </table>
+  {% if total %}
+  <div class="pager">
+    <span>Menampilkan {{ awal }} sampai {{ akhir }} dari {{ total }} hasil</span>
+    <form method="get" class="pager-form">
+      <input type="hidden" name="q" value="{{ q }}">
+      <input type="hidden" name="urut" value="{{ urut }}">
+      <input type="hidden" name="arah" value="{{ arah }}">
+      {% if halaman > 1 %}<a href="{{ url_for('menu.dimensi', q=q, urut=urut, arah=arah, per=per, halaman=halaman-1) }}">Sebelumnya</a>{% endif %}
+      {% if akhir < total %}<a href="{{ url_for('menu.dimensi', q=q, urut=urut, arah=arah, per=per, halaman=halaman+1) }}">Berikutnya</a>{% endif %}
+      <label>per halaman</label>
+      <select name="per" onchange="this.form.submit()">
+        {% for n in [10, 25, 50, 100] %}<option value="{{ n }}" {% if per == n %}selected{% endif %}>{{ n }}</option>{% endfor %}
+      </select>
+    </form>
+  </div>
+  {% endif %}
 </div>
+{% if admin %}
+<div class="modal-back" id="modal-dimensi" onclick="if (event.target === this) tutupModal()">
+  <div class="modal modal-lebar" role="dialog" aria-modal="true" aria-labelledby="judul-dimensi">
+    <button class="modal-x" type="button" onclick="tutupModal()" aria-label="Tutup">×</button>
+    <h3 id="judul-dimensi">Buat Dimensi Sikap</h3>
+    <form method="post" action="{{ url_for('menu.simpan_dimensi') }}" id="form-dimensi">
+      <input type="hidden" name="id" id="dimensi-id">
+      <input type="hidden" name="q" value="{{ q }}">
+      <div class="modal-grid">
+        <div>
+          <div class="form-grid">
+            <div>
+              <label>Kode Dimensi<span class="wajib">*</span></label>
+              <input type="text" name="kode" id="dimensi-kode" placeholder="Misal: iman, kritis, kolabor" required>
+            </div>
+            <div>
+              <label>Urutan Tampilan</label>
+              <input type="number" name="urutan" id="dimensi-urutan" value="1">
+            </div>
+            <div class="full">
+              <label>Nama Dimensi Profil Lulusan<span class="wajib">*</span></label>
+              <input type="text" name="nama" id="dimensi-nama" placeholder="Misal: Keimanan dan ketakwaan kepada Tuhan YME" required>
+            </div>
+            <div class="full">
+              <label>Indikator Sikap yang Diamati<span class="wajib">*</span></label>
+              <textarea name="indikator" id="dimensi-indikator" placeholder="Misal: Berdoa, menjalankan ibadah, menghormati keyakinan, berakhlak baik" required></textarea>
+            </div>
+          </div>
+        </div>
+        <div class="tingkat-box">
+          <h3>Pengaturan Tingkat Kelas</h3>
+          <p>Pilih tingkat kelas mana saja yang menggunakan dimensi sikap ini.</p>
+          <div class="tingkat-row">
+            <label class="tingkat-item"><input class="saklar" type="checkbox" name="kelas_7" id="dimensi-7" checked> <span>Aktif di<br>Kelas 7</span></label>
+            <label class="tingkat-item"><input class="saklar" type="checkbox" name="kelas_8" id="dimensi-8" checked> <span>Aktif di<br>Kelas 8</span></label>
+            <label class="tingkat-item"><input class="saklar" type="checkbox" name="kelas_9" id="dimensi-9" checked> <span>Aktif di<br>Kelas 9</span></label>
+          </div>
+        </div>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-amber" id="tombol-simpan" name="aksi" value="simpan" type="submit">Buat</button>
+        <button class="btn btn-ghost" id="tombol-lagi" name="aksi" value="lagi" type="submit">Buat & buat lainnya</button>
+        <button class="btn btn-ghost" type="button" onclick="tutupModal()">Batal</button>
+      </div>
+    </form>
+  </div>
+</div>
+<script id="data-dimensi" type="application/json">{{ rows|tojson }}</script>
+<script>
+var dataDimensi = JSON.parse(document.getElementById("data-dimensi").textContent);
+function tutupModal() { document.getElementById("modal-dimensi").classList.remove("open"); }
+function isiKelas(nyala7, nyala8, nyala9) {
+  document.getElementById("dimensi-7").checked = !!nyala7;
+  document.getElementById("dimensi-8").checked = !!nyala8;
+  document.getElementById("dimensi-9").checked = !!nyala9;
+}
+function bukaBaru() {
+  document.getElementById("judul-dimensi").textContent = "Buat Dimensi Sikap";
+  document.getElementById("dimensi-id").value = "";
+  document.getElementById("dimensi-kode").value = "";
+  document.getElementById("dimensi-nama").value = "";
+  document.getElementById("dimensi-indikator").value = "";
+  document.getElementById("dimensi-urutan").value = "1";
+  isiKelas(1, 1, 1);
+  document.getElementById("tombol-simpan").textContent = "Buat";
+  document.getElementById("tombol-lagi").hidden = false;
+  document.getElementById("modal-dimensi").classList.add("open");
+}
+function bukaUbah(id) {
+  var row = dataDimensi.filter(function (item) { return item.id === id; })[0];
+  if (!row) return;
+  document.getElementById("judul-dimensi").textContent = "Ubah dimensi sikap";
+  document.getElementById("dimensi-id").value = row.id;
+  document.getElementById("dimensi-kode").value = row.kode || "";
+  document.getElementById("dimensi-nama").value = row.nama || "";
+  document.getElementById("dimensi-indikator").value = row.indikator || "";
+  document.getElementById("dimensi-urutan").value = row.urutan;
+  isiKelas(row.kelas_7, row.kelas_8, row.kelas_9);
+  document.getElementById("tombol-simpan").textContent = "Simpan";
+  document.getElementById("tombol-lagi").hidden = true;
+  document.getElementById("modal-dimensi").classList.add("open");
+}
+{% if baru %}bukaBaru();{% endif %}
+</script>
+{% endif %}
 {% endblock %}

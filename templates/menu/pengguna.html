@@ -1,50 +1,84 @@
 {% extends "base.html" %}
 {% block title %}Data Pengguna{% endblock %}
 {% block content %}
-<h1 class="page-title">Data Pengguna</h1>
-<div class="toolbar">
-  <div>
-    <a class="btn {% if tab=='admin' %}btn-primary{% else %}btn-ghost{% endif %}" href="{{ url_for('menu.pengguna', tab='admin') }}">Administrator</a>
-    <a class="btn {% if tab=='guru' %}btn-primary{% else %}btn-ghost{% endif %}" href="{{ url_for('menu.pengguna', tab='guru') }}">Guru</a>
-    <a class="btn {% if tab=='siswa' %}btn-primary{% else %}btn-ghost{% endif %}" href="{{ url_for('menu.pengguna', tab='siswa') }}">Siswa</a>
-  </div>
-  <div style="display:flex;gap:8px">
-    <form method="post" action="{{ url_for('menu.generate_guru') }}"><button class="btn btn-primary">Generate akun guru</button></form>
-    <form method="post" action="{{ url_for('menu.generate_siswa') }}"><button class="btn btn-ghost">Generate akun siswa</button></form>
+<div class="crumb">Data Pengguna <span>›</span> Daftar</div>
+<div class="page-head">
+  <h1 class="page-title">Data Pengguna</h1>
+  <div class="seg">
+    <a class="btn btn-amber" href="{{ url_for('menu.form_pengguna') }}">Tambah Pengguna</a>
+    <form method="post" action="{{ url_for('menu.generate_semua', tab=tab) }}" onsubmit="return confirm('Buat akun untuk semua guru dan siswa yang belum punya akun?')">
+      <button class="btn btn-green" type="submit">Generate Semua Pengguna</button>
+    </form>
   </div>
 </div>
-<div class="card" style="margin-bottom:16px">
-  <h3>Tambah pengguna guru</h3>
-  <p class="sub">Centang tugas yang boleh diinput. Menu guru mengikuti centang ini, ditambah tugas yang terbaca dari wali kelas, pelajaran, ekskul, atau tahfidz.</p>
-  <form method="post">
-    <div class="form-grid">
-      <div><label>Username</label><input name="username" required></div>
-      <div><label>Nama</label><input name="nama" required></div>
-      <div><label>Kata sandi awal</label><input name="password" value="guru123"></div>
-      <div>
-        <label>Guru</label>
-        <select name="guru_id"><option value="">-</option>{% for g in guru %}<option value="{{ g.id }}">{{ g.nama }}</option>{% endfor %}</select>
-      </div>
-      <div class="full">
-        <label class="check"><input type="checkbox" name="tugas" value="bidang_studi"> Guru bidang studi</label>
-        <label class="check"><input type="checkbox" name="tugas" value="walas"> Wali kelas</label>
-        <label class="check"><input type="checkbox" name="tugas" value="ekskul"> Guru ekstrakurikuler</label>
-        <label class="check"><input type="checkbox" name="tugas" value="tahfidz"> Guru tahfidz</label>
-      </div>
-    </div>
-    <div class="form-actions"><button class="btn btn-primary">Simpan pengguna</button></div>
+<div class="tab-wrap">
+  <div class="tab-pills">
+    <a class="{% if tab=='admin' %}on{% endif %}" href="{{ url_for('menu.pengguna', tab='admin', q=q, per=per) }}">Administrator</a>
+    <a class="{% if tab=='guru' %}on{% endif %}" href="{{ url_for('menu.pengguna', tab='guru', q=q, per=per) }}">Guru</a>
+    <a class="{% if tab=='siswa' %}on{% endif %}" href="{{ url_for('menu.pengguna', tab='siswa', q=q, per=per) }}">Siswa</a>
+  </div>
+</div>
+<div class="toolbar">
+  <span></span>
+  <form method="get">
+    <input type="hidden" name="tab" value="{{ tab }}">
+    <input type="hidden" name="per" value="{{ per }}">
+    <input class="search" name="q" value="{{ q }}" placeholder="Cari">
   </form>
 </div>
-<div class="card" style="padding:8px 16px 16px">
+<div class="card" style="padding:8px 16px 16px;overflow:auto">
   <table class="data">
-    <thead><tr><th>Username</th><th>Nama</th><th>Level</th><th>Tugas</th></tr></thead>
+    <thead>
+      <tr>
+        <th>No</th><th>Username</th><th>Nama Pengguna</th><th>e-Mail</th><th>Level</th>
+        <th>Status Aktif</th><th>Login Terakhir</th><th>IP Address</th><th>Status Online</th>
+        {% if tab=='guru' %}<th>Tugas</th>{% endif %}
+        <th></th>
+      </tr>
+    </thead>
     <tbody>
     {% for r in rows %}
       <tr>
-        <td>{{ r.username }}</td><td>{{ r.nama }}</td><td>{{ r.role }}</td><td>{{ r.tugas_nama or '-' }}</td>
+        <td>{{ awal + loop.index0 }}</td>
+        <td>{{ r.username }}</td>
+        <td>{{ r.nama }}</td>
+        <td>{{ r.email or (r.username ~ '@erapor.local') }}</td>
+        <td>
+          {% if r.role=='admin' %}<span class="lvl lvl-admin">Admin</span>
+          {% elif r.role=='siswa' %}<span class="lvl lvl-siswa">Siswa</span>
+          {% else %}<span class="lvl lvl-guru">Guru</span>{% endif %}
+        </td>
+        <td>{% if r.aktif!=0 %}<span class="lvl lvl-aktif">Aktif</span>{% else %}<span class="lvl lvl-off">Nonaktif</span>{% endif %}</td>
+        <td>{{ r.login_terakhir.strftime('%d/%m/%Y %H:%M:%S') if r.login_terakhir else '-' }}</td>
+        <td>{{ r.ip_address or '-' }}</td>
+        <td>{% if r.sedang_login %}<span class="lvl lvl-aktif">Online</span>{% else %}<span class="lvl lvl-off">Offline</span>{% endif %}</td>
+        {% if tab=='guru' %}<td>{{ r.tugas_nama or '-' }}</td>{% endif %}
+        <td class="actions">
+          <a class="btn-ubah" href="{{ url_for('menu.form_pengguna', item_id=r.id) }}">Ubah</a>
+          {% if r.username!='admin' and r.id!=current_user.id %}
+          <form method="post" action="{{ url_for('menu.hapus_pengguna', item_id=r.id) }}" onsubmit="return confirm('Hapus pengguna ini?')">
+            <button class="btn btn-danger btn-sm" type="submit">Hapus</button>
+          </form>
+          {% endif %}
+        </td>
       </tr>
+    {% else %}
+      <tr><td colspan="10">Belum ada pengguna pada tab ini.</td></tr>
     {% endfor %}
     </tbody>
   </table>
+  <div class="pager">
+    <span>Menampilkan {{ awal }} sampai {{ akhir }} dari {{ total }} hasil</span>
+    <form method="get" class="pager-form">
+      <input type="hidden" name="tab" value="{{ tab }}">
+      <input type="hidden" name="q" value="{{ q }}">
+      {% if halaman>1 %}<a href="{{ url_for('menu.pengguna', tab=tab, q=q, per=per, halaman=halaman-1) }}">Sebelumnya</a>{% endif %}
+      {% if akhir<total %}<a href="{{ url_for('menu.pengguna', tab=tab, q=q, per=per, halaman=halaman+1) }}">Berikutnya</a>{% endif %}
+      <label>per halaman</label>
+      <select name="per" onchange="this.form.submit()">
+        {% for n in [10, 25, 50, 100] %}<option value="{{ n }}" {% if per==n %}selected{% endif %}>{{ n }}</option>{% endfor %}
+      </select>
+    </form>
+  </div>
 </div>
 {% endblock %}

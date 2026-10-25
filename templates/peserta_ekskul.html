@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Peserta {{ ekskul.nama }}{% endblock %}
+{% block content_class %}content-wide{% endblock %}
+{% block content %}
+<div class="crumb">Data Ekstra Kurikuler <span>›</span> Peserta</div>
+<div class="page-head">
+  <h1 class="page-title">Peserta {{ ekskul.nama }}</h1>
+  <a class="btn btn-ghost" href="{{ url_for('main.data_ekskul') }}">Kembali</a>
+</div>
+<div class="card">
+  <h3 class="section-title">Peserta saat ini</h3>
+  <p class="sub">{{ anggota|length }} siswa</p>
+  <table class="data">
+    <thead><tr><th>Nama</th><th>NIS</th><th>Kelas</th></tr></thead>
+    <tbody>
+    {% for s in anggota %}
+      <tr><td>{{ s.nama }}</td><td>{{ s.nis }}</td><td>{{ s.kelas_nama or '-' }}</td></tr>
+    {% else %}
+      <tr><td colspan="3">Belum ada peserta.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+<div class="card">
+  <h3 class="section-title">Tambah dari kelas</h3>
+  <form method="get">
+    <label>Kelas</label>
+    <select name="kelas_id" onchange="this.form.submit()">
+      <option value="">Pilih salah satu opsi</option>
+      {% for k in kelas %}
+      <option value="{{ k.id }}" {% if kelas_id|string == k.id|string %}selected{% endif %}>{{ k.nama }}</option>
+      {% endfor %}
+    </select>
+  </form>
+  {% if calon %}
+  <form method="post">
+    <input type="hidden" name="kelas_id" value="{{ kelas_id }}">
+    <table class="data">
+      <thead><tr><th></th><th>Nama</th><th>NIS</th></tr></thead>
+      <tbody>
+      {% for s in calon %}
+        <tr>
+          <td><input type="checkbox" name="siswa_id" value="{{ s.id }}" {% if s.ikut %}checked{% endif %}></td>
+          <td>{{ s.nama }}</td>
+          <td>{{ s.nis }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    <div class="form-actions"><button class="btn btn-amber" type="submit">Simpan peserta</button></div>
+  </form>
+  {% endif %}
+</div>
+{% endblock %}

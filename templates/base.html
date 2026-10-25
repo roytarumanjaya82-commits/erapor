@@ -86,7 +86,7 @@
       </div>
       {% endif %}
     </aside>
-    <main class="content">
+    <main class="content {% block content_class %}{% endblock %}">
       {% with messages = get_flashed_messages(with_categories=true) %}
         {% for cat, msg in messages %}
           <div class="flash {{ cat }}">{{ msg }}</div>

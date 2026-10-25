@@ -15,6 +15,10 @@ DROP TABLE IF EXISTS gabung_mapel_item;
 DROP TABLE IF EXISTS gabung_mapel;
 DROP TABLE IF EXISTS mapping_rapor;
 DROP TABLE IF EXISTS nilai_ekskul;
+DROP TABLE IF EXISTS peserta_ekskul;
+DROP TABLE IF EXISTS predikat_sikap;
+DROP TABLE IF EXISTS dimensi_sikap;
+DROP TABLE IF EXISTS user_tugas;
 DROP TABLE IF EXISTS ekstrakurikuler;
 DROP TABLE IF EXISTS nilai_sumatif;
 DROP TABLE IF EXISTS nilai_formatif;
@@ -34,7 +38,7 @@ CREATE TABLE sekolah (
   id INT PRIMARY KEY AUTO_INCREMENT,
   nama VARCHAR(200) NOT NULL,
   npsn VARCHAR(20),
-  jenjang VARCHAR(20) DEFAULT 'SMA',
+  jenjang VARCHAR(20) DEFAULT 'SMP',
   alamat TEXT,
   kelurahan VARCHAR(100),
   kecamatan VARCHAR(100),
@@ -46,6 +50,9 @@ CREATE TABLE sekolah (
   website VARCHAR(150),
   kepala_sekolah VARCHAR(150),
   nip_kepala VARCHAR(40),
+  status_sekolah VARCHAR(30),
+  tempat_rapor VARCHAR(100),
+  tanggal_rapor DATE,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
@@ -59,6 +66,7 @@ CREATE TABLE tahun_ajaran (
 CREATE TABLE guru (
   id INT PRIMARY KEY AUTO_INCREMENT,
   nip VARCHAR(30),
+  nbm VARCHAR(30),
   nuptk VARCHAR(30),
   nama VARCHAR(150) NOT NULL,
   gelar_depan VARCHAR(20) DEFAULT '',
@@ -82,9 +90,21 @@ CREATE TABLE users (
   username VARCHAR(50) NOT NULL UNIQUE,
   password_hash VARCHAR(255) NOT NULL,
   nama VARCHAR(150) NOT NULL,
-  role ENUM('admin','guru','wali_kelas') NOT NULL DEFAULT 'admin',
+  role ENUM('admin','guru','wali_kelas','siswa') NOT NULL DEFAULT 'guru',
+  email VARCHAR(150),
+  aktif TINYINT NOT NULL DEFAULT 1,
+  login_terakhir DATETIME NULL,
+  ip_address VARCHAR(45),
+  sedang_login TINYINT NOT NULL DEFAULT 0,
   guru_id INT NULL,
   CONSTRAINT fk_users_guru FOREIGN KEY (guru_id) REFERENCES guru(id) ON DELETE SET NULL
+);
+
+CREATE TABLE user_tugas (
+  user_id INT NOT NULL,
+  tugas VARCHAR(30) NOT NULL,
+  PRIMARY KEY (user_id, tugas),
+  CONSTRAINT fk_ut_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
 CREATE TABLE kelas (
@@ -103,8 +123,9 @@ CREATE TABLE siswa (
   id INT PRIMARY KEY AUTO_INCREMENT,
   nis VARCHAR(20) NOT NULL,
   nisn VARCHAR(20),
+  nik VARCHAR(20),
   nama VARCHAR(150) NOT NULL,
-  jenis_kelamin ENUM('L','P') DEFAULT 'L',
+  jenis_kelamin ENUM('L','P') NULL,
   tempat_lahir VARCHAR(100),
   tanggal_lahir DATE,
   agama VARCHAR(20) DEFAULT 'Islam',
@@ -120,7 +141,7 @@ CREATE TABLE siswa (
 
 CREATE TABLE kelompok_mapel (
   id INT PRIMARY KEY AUTO_INCREMENT,
-  kode VARCHAR(20) NOT NULL,
+  kode VARCHAR(60) NOT NULL,
   nama VARCHAR(120) NOT NULL,
   urutan INT DEFAULT 0
 );
@@ -136,16 +157,19 @@ CREATE TABLE mata_pelajaran (
 
 CREATE TABLE pelajaran (
   id INT PRIMARY KEY AUTO_INCREMENT,
+  kode VARCHAR(36),
   tahun_ajaran_id INT NOT NULL,
   kelas_id INT NOT NULL,
   mapel_id INT NOT NULL,
-  guru_id INT NOT NULL,
-  jam_per_minggu INT DEFAULT 2,
+  guru_id INT NULL,
+  jam_per_minggu INT NULL,
+  status_kurikulum VARCHAR(30),
   CONSTRAINT fk_pel_ta FOREIGN KEY (tahun_ajaran_id) REFERENCES tahun_ajaran(id) ON DELETE CASCADE,
   CONSTRAINT fk_pel_kelas FOREIGN KEY (kelas_id) REFERENCES kelas(id) ON DELETE CASCADE,
   CONSTRAINT fk_pel_mapel FOREIGN KEY (mapel_id) REFERENCES mata_pelajaran(id) ON DELETE CASCADE,
   CONSTRAINT fk_pel_guru FOREIGN KEY (guru_id) REFERENCES guru(id) ON DELETE CASCADE,
-  UNIQUE KEY uk_pelajaran (tahun_ajaran_id, kelas_id, mapel_id)
+  UNIQUE KEY uk_pelajaran (tahun_ajaran_id, kelas_id, mapel_id),
+  UNIQUE KEY uk_pelajaran_kode (kode)
 );
 
 CREATE TABLE perencanaan_penilaian (
@@ -183,7 +207,27 @@ CREATE TABLE ekstrakurikuler (
   id INT PRIMARY KEY AUTO_INCREMENT,
   nama VARCHAR(120) NOT NULL,
   pembina_id INT NULL,
+  nama_pembina VARCHAR(150),
   CONSTRAINT fk_ekskul_pembina FOREIGN KEY (pembina_id) REFERENCES guru(id) ON DELETE SET NULL
+);
+
+CREATE TABLE peserta_ekskul (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  ekskul_id INT NOT NULL,
+  siswa_id INT NOT NULL,
+  UNIQUE KEY uk_peserta_ekskul (ekskul_id, siswa_id),
+  CONSTRAINT fk_peserta_ekskul FOREIGN KEY (ekskul_id) REFERENCES ekstrakurikuler(id) ON DELETE CASCADE,
+  CONSTRAINT fk_peserta_siswa FOREIGN KEY (siswa_id) REFERENCES siswa(id) ON DELETE CASCADE
+);
+
+CREATE TABLE nilai_ekskul (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  ekskul_id INT NOT NULL,
+  siswa_id INT NOT NULL,
+  nilai VARCHAR(30),
+  UNIQUE KEY uk_nilai_ekskul (ekskul_id, siswa_id),
+  CONSTRAINT fk_ne_ekskul FOREIGN KEY (ekskul_id) REFERENCES ekstrakurikuler(id) ON DELETE CASCADE,
+  CONSTRAINT fk_ne_siswa FOREIGN KEY (siswa_id) REFERENCES siswa(id) ON DELETE CASCADE
 );
 
 CREATE TABLE mapping_rapor (
@@ -191,7 +235,13 @@ CREATE TABLE mapping_rapor (
   mapel_id INT NOT NULL,
   tampil_rapor TINYINT DEFAULT 1,
   urutan INT DEFAULT 0,
-  CONSTRAINT fk_maprapor_mapel FOREIGN KEY (mapel_id) REFERENCES mata_pelajaran(id) ON DELETE CASCADE
+  kurikulum VARCHAR(80),
+  tingkat VARCHAR(10),
+  nama_lokal VARCHAR(150),
+  kelompok_id INT NULL,
+  CONSTRAINT fk_maprapor_mapel FOREIGN KEY (mapel_id) REFERENCES mata_pelajaran(id) ON DELETE CASCADE,
+  CONSTRAINT fk_maprapor_kelompok FOREIGN KEY (kelompok_id) REFERENCES kelompok_mapel(id) ON DELETE SET NULL,
+  UNIQUE KEY uk_mapping_rapor (kurikulum, tingkat, mapel_id)
 );
 
 CREATE TABLE gabung_mapel (
@@ -211,14 +261,17 @@ CREATE TABLE tryout (
   id INT PRIMARY KEY AUTO_INCREMENT,
   nama VARCHAR(150) NOT NULL,
   tanggal DATE,
-  tingkat VARCHAR(10) DEFAULT 'XII'
+  tingkat VARCHAR(10) DEFAULT '9'
 );
 
 CREATE TABLE aspek_tahfiz (
   id INT PRIMARY KEY AUTO_INCREMENT,
   nama VARCHAR(150) NOT NULL,
   jenis VARCHAR(50) DEFAULT 'Hafalan',
-  kkm INT DEFAULT 75
+  kkm INT DEFAULT 75,
+  urutan INT DEFAULT 1,
+  aktif TINYINT DEFAULT 1,
+  dibuat DATETIME NULL
 );
 
 CREATE TABLE mapping_guru_tahfiz (
@@ -226,6 +279,7 @@ CREATE TABLE mapping_guru_tahfiz (
   guru_id INT NOT NULL,
   kelas_id INT NOT NULL,
   aspek_id INT NOT NULL,
+  dibuat DATETIME NULL,
   CONSTRAINT fk_mgt_guru FOREIGN KEY (guru_id) REFERENCES guru(id) ON DELETE CASCADE,
   CONSTRAINT fk_mgt_kelas FOREIGN KEY (kelas_id) REFERENCES kelas(id) ON DELETE CASCADE,
   CONSTRAINT fk_mgt_aspek FOREIGN KEY (aspek_id) REFERENCES aspek_tahfiz(id) ON DELETE CASCADE
@@ -235,7 +289,12 @@ CREATE TABLE pengaturan_rapor_tahfiz (
   id INT PRIMARY KEY AUTO_INCREMENT,
   tampilkan TINYINT DEFAULT 1,
   judul VARCHAR(150) DEFAULT 'Rapor Tahfiz',
-  keterangan TEXT
+  keterangan TEXT,
+  tanggal_hijriah VARCHAR(80),
+  tanggal_masehi VARCHAR(80),
+  tempat_cetak VARCHAR(120),
+  nama_kepala VARCHAR(150),
+  nbm_kepala VARCHAR(40)
 );
 
 CREATE TABLE nilai_tahfiz (
@@ -250,4 +309,24 @@ CREATE TABLE nilai_tahfiz (
   CONSTRAINT fk_nt_aspek FOREIGN KEY (aspek_id) REFERENCES aspek_tahfiz(id) ON DELETE CASCADE,
   CONSTRAINT fk_nt_ta FOREIGN KEY (tahun_ajaran_id) REFERENCES tahun_ajaran(id) ON DELETE CASCADE,
   UNIQUE KEY uk_nt (siswa_id, aspek_id, tahun_ajaran_id)
+);
+
+CREATE TABLE dimensi_sikap (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  kode VARCHAR(60) NULL,
+  nama VARCHAR(150) NOT NULL,
+  indikator TEXT,
+  kelas_7 TINYINT DEFAULT 1,
+  kelas_8 TINYINT DEFAULT 1,
+  kelas_9 TINYINT DEFAULT 1,
+  urutan INT DEFAULT 0,
+  UNIQUE KEY uk_dimensi_kode (kode)
+);
+
+CREATE TABLE predikat_sikap (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  nama VARCHAR(50) NOT NULL,
+  deskripsi VARCHAR(255),
+  aktif TINYINT DEFAULT 1,
+  urutan INT DEFAULT 0
 );

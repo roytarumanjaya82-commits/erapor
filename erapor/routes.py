@@ -1,5 +1,6 @@
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
+from uuid import uuid4
 
 from flask import Blueprint, flash, redirect, render_template, request, session, url_for
 from .auth import login_required
@@ -12,12 +13,14 @@ class InputError(ValueError):
 
 bp = Blueprint("main", __name__)
 
+TINGKAT_KELAS = ("7", "8", "9")
+KURIKULUM_SEKOLAH = ("Kurikulum Merdeka", "Kurikulum 2013")
 ORDER_KELAS = (
-    "FIELD(tingkat,'VII','VIII','IX','X','XI','XII'), "
+    "FIELD(tingkat,'7','8','9'), "
     "CAST(SUBSTRING_INDEX(nama,'-',-1) AS UNSIGNED), nama"
 )
 ORDER_KELAS_K = (
-    "FIELD(k.tingkat,'VII','VIII','IX','X','XI','XII'), "
+    "FIELD(k.tingkat,'7','8','9'), "
     "CAST(SUBSTRING_INDEX(k.nama,'-',-1) AS UNSIGNED), k.nama"
 )
 
@@ -139,28 +142,129 @@ def dashboard():
 
 
 # ---------- Sekolah ----------
-@bp.route("/admin/sekolah", methods=["GET", "POST"])
+def _halaman_sekolah():
+    per = request.args.get("per", 10, type=int) or 10
+    if per not in (10, 25, 50, 100):
+        per = 10
+    halaman = request.args.get("halaman", 1, type=int) or 1
+    if halaman < 1:
+        halaman = 1
+    return per, halaman
+
+
+def _isi_sekolah():
+    def kosong(nama):
+        return (request.form.get(nama) or "").strip() or None
+
+    tanggal = clean_date(request.form.get("tanggal_rapor"))
+    if tanggal is False:
+        flash("Tanggal pembagian rapor tidak valid.", "error")
+        return None
+    if not tanggal:
+        flash("Tanggal pembagian rapor wajib diisi.", "error")
+        return None
+    nama = (request.form.get("nama") or "").strip()
+    npsn = (request.form.get("npsn") or "").strip()
+    if not nama or not npsn:
+        flash("Nama sekolah dan NPSN wajib diisi.", "error")
+        return None
+    return (
+        nama,
+        npsn,
+        kosong("status_sekolah"),
+        kosong("alamat"),
+        kosong("kelurahan"),
+        kosong("kecamatan"),
+        kosong("kabupaten"),
+        kosong("provinsi"),
+        kosong("kode_pos"),
+        kosong("telepon"),
+        kosong("email"),
+        kosong("tempat_rapor"),
+        tanggal,
+        kosong("kepala_sekolah"),
+        kosong("nip_kepala"),
+    )
+
+
+@bp.route("/admin/sekolah")
 @login_required
 def data_sekolah():
-    if request.method == "POST":
-        fields = [
-            "nama", "npsn", "jenjang", "alamat", "kelurahan", "kecamatan",
-            "kabupaten", "provinsi", "kode_pos", "telepon", "email", "website",
-            "kepala_sekolah", "nip_kepala",
-        ]
-        vals = [request.form.get(f) or None for f in fields]
-        row = query("SELECT id FROM sekolah LIMIT 1", one=True)
-        if row:
-            sets = ", ".join(f"{f}=%s" for f in fields)
-            execute(f"UPDATE sekolah SET {sets} WHERE id=%s", (*vals, row["id"]))
-        else:
-            cols = ", ".join(fields)
-            ph = ", ".join(["%s"] * len(fields))
-            execute(f"INSERT INTO sekolah ({cols}) VALUES ({ph})", vals)
-        flash("Data sekolah disimpan.", "success")
+    q = (request.args.get("q") or "").strip()
+    per, halaman = _halaman_sekolah()
+    where = ""
+    params = []
+    if q:
+        where = "WHERE nama LIKE %s OR npsn LIKE %s OR alamat LIKE %s OR kabupaten LIKE %s OR kepala_sekolah LIKE %s"
+        like = f"%{q}%"
+        params = [like, like, like, like, like]
+    total = query(f"SELECT COUNT(*) AS n FROM sekolah {where}", params, one=True)["n"]
+    halaman_max = max((total + per - 1) // per, 1)
+    if halaman > halaman_max:
+        halaman = halaman_max
+    awal = 0 if total == 0 else (halaman - 1) * per + 1
+    rows = query(
+        f"""SELECT id, nama, npsn, alamat, kabupaten, kepala_sekolah
+            FROM sekolah {where}
+            ORDER BY nama, id
+            LIMIT %s OFFSET %s""",
+        (*params, per, (halaman - 1) * per),
+    )
+    akhir = 0 if total == 0 else awal + len(rows) - 1
+    return render_template(
+        "sekolah.html",
+        rows=rows,
+        q=q,
+        per=per,
+        halaman=halaman,
+        total=total,
+        awal=awal,
+        akhir=akhir,
+        nav="sekolah",
+    )
+
+
+@bp.route("/admin/sekolah/form", methods=["GET", "POST"])
+@bp.route("/admin/sekolah/form/<int:item_id>", methods=["GET", "POST"])
+@login_required
+def form_sekolah(item_id=None):
+    row = query("SELECT * FROM sekolah WHERE id=%s", (item_id,), one=True) if item_id else None
+    if item_id and not row:
+        flash("Data sekolah tidak ditemukan.", "error")
         return redirect(url_for("main.data_sekolah"))
-    sekolah = query("SELECT * FROM sekolah LIMIT 1", one=True) or {}
-    return render_template("sekolah.html", sekolah=sekolah, nav="sekolah")
+    if request.method == "POST":
+        data = _isi_sekolah()
+        if data is None:
+            return redirect(request.url)
+        if row:
+            execute(
+                """UPDATE sekolah
+                   SET nama=%s, npsn=%s, status_sekolah=%s, alamat=%s, kelurahan=%s, kecamatan=%s,
+                       kabupaten=%s, provinsi=%s, kode_pos=%s, telepon=%s, email=%s,
+                       tempat_rapor=%s, tanggal_rapor=%s, kepala_sekolah=%s, nip_kepala=%s
+                   WHERE id=%s""",
+                (*data, row["id"]),
+            )
+            flash("Data sekolah disimpan.", "success")
+        else:
+            execute(
+                """INSERT INTO sekolah
+                   (nama, npsn, status_sekolah, alamat, kelurahan, kecamatan, kabupaten, provinsi,
+                    kode_pos, telepon, email, tempat_rapor, tanggal_rapor, kepala_sekolah, nip_kepala, jenjang)
+                   VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'SMP')""",
+                data,
+            )
+            flash("Sekolah baru disimpan.", "success")
+        return redirect(url_for("main.data_sekolah"))
+    return render_template("sekolah_form.html", row=row or {}, nav="sekolah")
+
+
+@bp.route("/admin/sekolah/hapus/<int:item_id>", methods=["POST"])
+@login_required
+def hapus_sekolah(item_id):
+    execute("DELETE FROM sekolah WHERE id=%s", (item_id,))
+    flash("Data sekolah dihapus.", "success")
+    return redirect(url_for("main.data_sekolah"))
 
 
 # ---------- Guru ----------
@@ -168,16 +272,15 @@ def data_sekolah():
 @login_required
 def data_guru():
     from .guru_excel import ensure_guru_columns
-    if not any(col["Field"] == "mapel_ajar" for col in query("SHOW COLUMNS FROM guru")):
-        ensure_guru_columns()
+    ensure_guru_columns()
     q = (request.args.get("q") or "").strip()
     if q:
         like = f"%{q}%"
         rows = query(
             """SELECT * FROM guru
-               WHERE nama LIKE %s OR nip LIKE %s OR nuptk LIKE %s OR mapel_ajar LIKE %s
+               WHERE nama LIKE %s OR nip LIKE %s OR nbm LIKE %s OR nuptk LIKE %s OR mapel_ajar LIKE %s
                ORDER BY nama""",
-            (like, like, like, like),
+            (like, like, like, like, like),
         )
     else:
         rows = query("SELECT * FROM guru ORDER BY nama")
@@ -205,6 +308,8 @@ def upload_guru():
 @bp.route("/admin/guru/form/<int:item_id>", methods=["GET", "POST"])
 @login_required
 def form_guru(item_id=None):
+    from .guru_excel import ensure_guru_columns
+    ensure_guru_columns()
     row = query("SELECT * FROM guru WHERE id=%s", (item_id,), one=True) if item_id else None
     if item_id and not row:
         return _missing(row, "main.data_guru")
@@ -213,28 +318,37 @@ def form_guru(item_id=None):
         if tanggal is False:
             flash("Tanggal lahir tidak valid.", "error")
             return redirect(request.url)
+        def kosong(nama):
+            nilai = (request.form.get(nama) or "").strip()
+            return nilai or None
+
+        jk = request.form.get("jenis_kelamin") or ""
+        if jk not in {"L", "P"}:
+            jk = None
+        jam = kosong("jumlah_jam")
         data = (
-            request.form.get("nip"),
-            request.form.get("nuptk"),
-            request.form.get("nama"),
-            request.form.get("gelar_depan") or "",
-            request.form.get("gelar_belakang") or "",
-            request.form.get("jenis_kelamin") or "L",
-            request.form.get("tempat_lahir"),
+            kosong("nip"),
+            kosong("nbm"),
+            kosong("nuptk"),
+            (request.form.get("nama") or "").strip(),
+            (request.form.get("gelar_depan") or "").strip(),
+            (request.form.get("gelar_belakang") or "").strip(),
+            jk,
+            kosong("tempat_lahir"),
             tanggal,
             request.form.get("agama") or "Islam",
-            request.form.get("alamat"),
-            request.form.get("no_hp"),
-            request.form.get("email"),
+            kosong("alamat"),
+            kosong("no_hp"),
+            kosong("email"),
             request.form.get("status_kepegawaian") or "Guru Tetap",
-            request.form.get("mapel_ajar"),
-            to_int(request.form.get("jumlah_jam"), 0),
-            request.form.get("mengajar_di"),
-            to_int(request.form.get("aktif"), 1),
+            kosong("mapel_ajar"),
+            int(jam) if jam and jam.isdigit() else None,
+            kosong("mengajar_di"),
+            1 if request.form.get("aktif") != "0" else 0,
         )
         if item_id:
             execute(
-                """UPDATE guru SET nip=%s,nuptk=%s,nama=%s,gelar_depan=%s,gelar_belakang=%s,
+                """UPDATE guru SET nip=%s,nbm=%s,nuptk=%s,nama=%s,gelar_depan=%s,gelar_belakang=%s,
                 jenis_kelamin=%s,tempat_lahir=%s,tanggal_lahir=%s,agama=%s,alamat=%s,no_hp=%s,
                 email=%s,status_kepegawaian=%s,mapel_ajar=%s,jumlah_jam=%s,mengajar_di=%s,aktif=%s WHERE id=%s""",
                 (*data, item_id),
@@ -242,10 +356,10 @@ def form_guru(item_id=None):
             flash("Data guru diperbarui.", "success")
         else:
             execute(
-                """INSERT INTO guru (nip,nuptk,nama,gelar_depan,gelar_belakang,jenis_kelamin,
+                """INSERT INTO guru (nip,nbm,nuptk,nama,gelar_depan,gelar_belakang,jenis_kelamin,
                 tempat_lahir,tanggal_lahir,agama,alamat,no_hp,email,status_kepegawaian,
                 mapel_ajar,jumlah_jam,mengajar_di,aktif)
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
                 data,
             )
             flash("Guru baru ditambahkan.", "success")
@@ -302,9 +416,13 @@ def form_kelas(item_id=None):
         if not ta_id:
             flash("Tahun ajaran aktif belum diatur.", "error")
             return redirect(url_for("main.data_kelas"))
+        tingkat = request.form.get("tingkat")
+        if tingkat not in TINGKAT_KELAS:
+            flash("Tingkat kelas hanya 7, 8, atau 9.", "error")
+            return redirect(request.url)
         data = (
             request.form.get("nama"),
-            request.form.get("tingkat"),
+            tingkat,
             request.form.get("jurusan") or "Umum",
             request.form.get("wali_kelas_id") or None,
             ta_id,
@@ -346,28 +464,122 @@ def hapus_kelas(item_id):
 
 
 # ---------- Siswa ----------
+def _admin_sekolah():
+    return session.get("role") == "admin" or "admin" in set(session.get("tugas") or [])
+
+
+def _kelas_siswa():
+    if _admin_sekolah():
+        return query(f"SELECT id, nama FROM kelas ORDER BY {ORDER_KELAS}")
+    return query(
+        f"SELECT id, nama FROM kelas WHERE wali_kelas_id=%s ORDER BY {ORDER_KELAS}",
+        (session.get("guru_id") or 0,),
+    )
+
+
+def _saringan_siswa():
+    q = (request.args.get("q") or "").strip()
+    kelas_id = request.args.get("kelas_id") or ""
+    jk = request.args.get("jk") or ""
+    if jk not in {"L", "P"}:
+        jk = ""
+    where = ["1=1"]
+    params = []
+    if q:
+        where.append("(s.nama LIKE %s OR s.nis LIKE %s OR s.nisn LIKE %s OR s.nik LIKE %s)")
+        like = f"%{q}%"
+        params.extend([like, like, like, like])
+    if not _admin_sekolah():
+        where.append("s.kelas_id IN (SELECT id FROM kelas WHERE wali_kelas_id=%s)")
+        params.append(session.get("guru_id") or 0)
+    if kelas_id.isdigit():
+        where.append("s.kelas_id=%s")
+        params.append(int(kelas_id))
+    else:
+        kelas_id = ""
+    if jk:
+        where.append("s.jenis_kelamin=%s")
+        params.append(jk)
+    return q, kelas_id, jk, " AND ".join(where), params
+
+
 @bp.route("/admin/siswa")
 @login_required
 def data_siswa():
-    q = (request.args.get("q") or "").strip()
-    kelas_id = request.args.get("kelas_id") or ""
-    kelas = query(f"SELECT id, nama FROM kelas ORDER BY {ORDER_KELAS}")
-    sql = """SELECT s.*, k.nama AS kelas_nama FROM siswa s
-             LEFT JOIN kelas k ON k.id=s.kelas_id WHERE 1=1"""
-    params = []
-    if q:
-        sql += " AND (s.nama LIKE %s OR s.nis LIKE %s OR s.nisn LIKE %s)"
-        like = f"%{q}%"
-        params.extend([like, like, like])
-    if "admin" not in set(session.get("tugas") or []) and session.get("role") != "admin":
-        sql += " AND s.kelas_id IN (SELECT id FROM kelas WHERE wali_kelas_id=%s)"
-        params.append(session.get("guru_id") or 0)
-    if kelas_id:
-        sql += " AND s.kelas_id=%s"
-        params.append(kelas_id)
-    sql += f" ORDER BY {ORDER_KELAS_K}, s.nama"
-    rows = query(sql, params)
-    return render_template("list_siswa.html", rows=rows, kelas=kelas, q=q, kelas_id=kelas_id, nav="siswa")
+    q, kelas_id, jk, where, params = _saringan_siswa()
+    per = request.args.get("per", 10, type=int) or 10
+    if per not in (10, 25, 50, 100):
+        per = 10
+    halaman = request.args.get("halaman", 1, type=int) or 1
+    if halaman < 1:
+        halaman = 1
+    urut = request.args.get("urut") or "nama"
+    arah = "DESC" if request.args.get("arah") == "desc" else "ASC"
+    if urut == "kelas":
+        order = f"{ORDER_KELAS_K} {arah}, s.nama"
+    elif urut == "nisn":
+        order = f"s.nisn {arah}, s.nama"
+    elif urut == "nis":
+        order = f"s.nis {arah}, s.nama"
+    else:
+        urut = "nama"
+        order = f"s.nama {arah}, s.nis"
+    total = query(
+        f"SELECT COUNT(*) AS n FROM siswa s LEFT JOIN kelas k ON k.id=s.kelas_id WHERE {where}",
+        params,
+        one=True,
+    )["n"]
+    halaman_max = max((total + per - 1) // per, 1)
+    if halaman > halaman_max:
+        halaman = halaman_max
+    awal = 0 if total == 0 else (halaman - 1) * per + 1
+    rows = query(
+        f"""SELECT s.id, s.nama, s.nisn, s.nis, s.jenis_kelamin, k.nama AS kelas_nama
+            FROM siswa s LEFT JOIN kelas k ON k.id=s.kelas_id
+            WHERE {where} ORDER BY {order} LIMIT %s OFFSET %s""",
+        (*params, per, (halaman - 1) * per),
+    )
+    akhir = 0 if total == 0 else awal + len(rows) - 1
+    saring = int(bool(kelas_id)) + int(bool(jk))
+    return render_template(
+        "list_siswa.html",
+        rows=rows,
+        kelas=_kelas_siswa(),
+        q=q,
+        kelas_id=kelas_id,
+        jk=jk,
+        per=per,
+        halaman=halaman,
+        total=total,
+        awal=awal,
+        akhir=akhir,
+        urut=urut,
+        arah=arah.lower(),
+        saring=saring,
+        nav="siswa",
+    )
+
+
+def _isi_siswa():
+    def kosong(nama):
+        return (request.form.get(nama) or "").strip() or None
+
+    tanggal = clean_date(request.form.get("tanggal_lahir"))
+    if tanggal is False:
+        flash("Tanggal lahir tidak valid.", "error")
+        return None
+    nama = (request.form.get("nama") or "").strip()
+    nis = (request.form.get("nis") or "").strip()
+    jk = request.form.get("jenis_kelamin") or ""
+    kelas_id = request.form.get("kelas_id") or ""
+    if not nama or not nis or not kelas_id.isdigit() or jk not in {"L", "P"}:
+        flash("Nama, NIS, jenis kelamin, dan kelas wajib diisi.", "error")
+        return None
+    nik = kosong("nik")
+    if nik and (len(nik) != 16 or not nik.isdigit()):
+        flash("NIK harus 16 digit angka.", "error")
+        return None
+    return (nis, kosong("nisn"), nik, nama, jk, kosong("tempat_lahir"), tanggal, int(kelas_id))
 
 
 @bp.route("/admin/siswa/form", methods=["GET", "POST"])
@@ -377,43 +589,28 @@ def form_siswa(item_id=None):
     row = query("SELECT * FROM siswa WHERE id=%s", (item_id,), one=True) if item_id else None
     if item_id and not row:
         return _missing(row, "main.data_siswa")
-    kelas = query(f"SELECT id, nama FROM kelas ORDER BY {ORDER_KELAS}")
+    kelas = _kelas_siswa()
     if request.method == "POST":
-        tanggal = clean_date(request.form.get("tanggal_lahir"))
-        if tanggal is False:
-            flash("Tanggal lahir tidak valid.", "error")
+        data = _isi_siswa()
+        if data is None:
             return redirect(request.url)
-        data = (
-            request.form.get("nis"),
-            request.form.get("nisn"),
-            request.form.get("nama"),
-            request.form.get("jenis_kelamin") or "L",
-            request.form.get("tempat_lahir"),
-            tanggal,
-            request.form.get("agama") or "Islam",
-            request.form.get("alamat"),
-            request.form.get("nama_ayah"),
-            request.form.get("nama_ibu"),
-            request.form.get("no_hp"),
-            request.form.get("kelas_id") or None,
-            request.form.get("status") or "aktif",
-        )
         if item_id:
             execute(
-                """UPDATE siswa SET nis=%s,nisn=%s,nama=%s,jenis_kelamin=%s,tempat_lahir=%s,
-                tanggal_lahir=%s,agama=%s,alamat=%s,nama_ayah=%s,nama_ibu=%s,no_hp=%s,
-                kelas_id=%s,status=%s WHERE id=%s""",
+                """UPDATE siswa SET nis=%s, nisn=%s, nik=%s, nama=%s, jenis_kelamin=%s,
+                   tempat_lahir=%s, tanggal_lahir=%s, kelas_id=%s WHERE id=%s""",
                 (*data, item_id),
             )
             flash("Data siswa diperbarui.", "success")
         else:
             execute(
-                """INSERT INTO siswa (nis,nisn,nama,jenis_kelamin,tempat_lahir,tanggal_lahir,
-                agama,alamat,nama_ayah,nama_ibu,no_hp,kelas_id,status)
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+                """INSERT INTO siswa (nis, nisn, nik, nama, jenis_kelamin, tempat_lahir, tanggal_lahir,
+                   kelas_id, agama, status)
+                   VALUES (%s,%s,%s,%s,%s,%s,%s,%s,'Islam','aktif')""",
                 data,
             )
-            flash("Siswa baru ditambahkan.", "success")
+            flash("Peserta didik disimpan.", "success")
+            if request.form.get("aksi") == "lagi":
+                return redirect(url_for("main.form_siswa"))
         return redirect(url_for("main.data_siswa"))
     return render_template("form_siswa.html", row=row or {}, kelas=kelas, nav="siswa")
 
@@ -426,46 +623,217 @@ def hapus_siswa(item_id):
     return redirect(url_for("main.data_siswa"))
 
 
+@bp.route("/admin/siswa/hapus-terpilih", methods=["POST"])
+@login_required
+def hapus_siswa_terpilih():
+    ids = [int(nilai) for nilai in request.form.getlist("id") if str(nilai).isdigit()]
+    if not ids:
+        flash("Pilih peserta didik yang akan dihapus.", "error")
+        return redirect(url_for("main.data_siswa"))
+    tanda = ", ".join(["%s"] * len(ids))
+    execute(f"DELETE FROM siswa WHERE id IN ({tanda})", ids)
+    flash(f"{len(ids)} peserta didik dihapus.", "success")
+    return redirect(url_for("main.data_siswa"))
+
+
 # ---------- Kelompok mapel ----------
-@bp.route("/admin/kelompok-mapel", methods=["GET", "POST"])
+def _kelompok_terpakai(item_id):
+    try:
+        return bool(query("SELECT COUNT(*) AS n FROM mata_pelajaran WHERE kelompok_id=%s", (item_id,), one=True)["n"])
+    except Exception:
+        return False
+
+
+def _isi_kelompok(item_id=None):
+    kode = (request.form.get("kode") or "").strip()
+    nama = (request.form.get("nama") or "").strip()
+    if not kode or not nama:
+        flash("Kelompok dan nama kelompok wajib diisi.", "error")
+        return None
+    ada = query("SELECT id FROM kelompok_mapel WHERE kode=%s", (kode,), one=True)
+    if ada and ada["id"] != item_id:
+        flash("Kode kelompok itu sudah dipakai.", "error")
+        return None
+    return kode, nama
+
+
+@bp.route("/admin/kelompok-mapel")
 @login_required
 def data_kelompok():
+    q = (request.args.get("q") or "").strip()
+    per = request.args.get("per", 10, type=int) or 10
+    if per not in (10, 25, 50, 100):
+        per = 10
+    halaman = request.args.get("halaman", 1, type=int) or 1
+    if halaman < 1:
+        halaman = 1
+    urut = request.args.get("urut") or "kode"
+    arah = "DESC" if request.args.get("arah") == "desc" else "ASC"
+    where = ""
+    params = []
+    if q:
+        where = "WHERE kode LIKE %s OR nama LIKE %s"
+        like = f"%{q}%"
+        params = [like, like]
+    order = f"nama {arah}, kode" if urut == "nama" else f"kode {arah}, nama"
+    if urut != "nama":
+        urut = "kode"
+    total = query(f"SELECT COUNT(*) AS n FROM kelompok_mapel {where}", params, one=True)["n"]
+    halaman_max = max((total + per - 1) // per, 1)
+    if halaman > halaman_max:
+        halaman = halaman_max
+    awal = 0 if total == 0 else (halaman - 1) * per + 1
+    rows = query(
+        f"SELECT id, kode, nama, urutan FROM kelompok_mapel {where} ORDER BY {order} LIMIT %s OFFSET %s",
+        (*params, per, (halaman - 1) * per),
+    )
+    akhir = 0 if total == 0 else awal + len(rows) - 1
+    return render_template(
+        "list_kelompok.html",
+        rows=rows,
+        q=q,
+        per=per,
+        halaman=halaman,
+        total=total,
+        awal=awal,
+        akhir=akhir,
+        urut=urut,
+        arah=arah.lower(),
+        nav="kelompok",
+    )
+
+
+@bp.route("/admin/kelompok-mapel/form", methods=["GET", "POST"])
+@bp.route("/admin/kelompok-mapel/form/<int:item_id>", methods=["GET", "POST"])
+@login_required
+def form_kelompok(item_id=None):
+    row = query("SELECT * FROM kelompok_mapel WHERE id=%s", (item_id,), one=True) if item_id else None
+    if item_id and not row:
+        return _missing(row, "main.data_kelompok")
     if request.method == "POST":
-        execute(
-            "INSERT INTO kelompok_mapel (kode,nama,urutan) VALUES (%s,%s,%s)",
-            (request.form.get("kode"), request.form.get("nama"), to_int(request.form.get("urutan"), 0)),
-        )
-        flash("Kelompok mapel ditambahkan.", "success")
+        data = _isi_kelompok(item_id)
+        if data is None:
+            return redirect(request.url)
+        if item_id:
+            execute("UPDATE kelompok_mapel SET kode=%s, nama=%s WHERE id=%s", (*data, item_id))
+            flash("Kelompok mapel diperbarui.", "success")
+        else:
+            urutan = query("SELECT COALESCE(MAX(urutan), 0) AS n FROM kelompok_mapel", one=True)["n"] + 1
+            execute(
+                "INSERT INTO kelompok_mapel (kode, nama, urutan) VALUES (%s,%s,%s)",
+                (*data, urutan),
+            )
+            flash("Kelompok mapel disimpan.", "success")
+            if request.form.get("aksi") == "lagi":
+                return redirect(url_for("main.form_kelompok"))
         return redirect(url_for("main.data_kelompok"))
-    rows = query("SELECT * FROM kelompok_mapel ORDER BY urutan, id")
-    return render_template("list_kelompok.html", rows=rows, nav="kelompok")
+    return render_template("form_kelompok.html", row=row or {}, nav="kelompok")
 
 
 @bp.route("/admin/kelompok-mapel/hapus/<int:item_id>", methods=["POST"])
 @login_required
 def hapus_kelompok(item_id):
-    blocked = _in_use(
-        "SELECT COUNT(*) AS n FROM mata_pelajaran WHERE kelompok_id=%s",
-        (item_id,),
-        "Kelompok masih dipakai mata pelajaran. Pindahkan mapelnya dulu.",
-        "main.data_kelompok",
-    )
-    if blocked:
-        return blocked
+    if _kelompok_terpakai(item_id):
+        flash("Kelompok masih dipakai mata pelajaran. Lepaskan dulu sebelum menghapus.", "error")
+        return redirect(url_for("main.data_kelompok"))
     execute("DELETE FROM kelompok_mapel WHERE id=%s", (item_id,))
     flash("Kelompok mapel dihapus.", "success")
     return redirect(url_for("main.data_kelompok"))
 
 
+@bp.route("/admin/kelompok-mapel/hapus-terpilih", methods=["POST"])
+@login_required
+def hapus_kelompok_terpilih():
+    ids = [int(nilai) for nilai in request.form.getlist("id") if str(nilai).isdigit()]
+    if not ids:
+        flash("Pilih kelompok yang akan dihapus.", "error")
+        return redirect(url_for("main.data_kelompok"))
+    terhapus = 0
+    terpakai = 0
+    for item_id in ids:
+        if _kelompok_terpakai(item_id):
+            terpakai += 1
+            continue
+        execute("DELETE FROM kelompok_mapel WHERE id=%s", (item_id,))
+        terhapus += 1
+    if terhapus:
+        flash(f"{terhapus} kelompok mapel dihapus.", "success")
+    if terpakai:
+        flash(f"{terpakai} kelompok masih dipakai dan tidak dihapus.", "error")
+    return redirect(url_for("main.data_kelompok"))
+
+
 # ---------- Mapel ----------
+def _kode_mapel_baru():
+    rows = query("SELECT kode FROM mata_pelajaran")
+    angka = [int(row["kode"]) for row in rows if str(row["kode"] or "").isdigit()]
+    return str(max(angka) + 1) if angka else "900000001"
+
+
+def _mapel_terpakai(item_id):
+    for sql in (
+        "SELECT COUNT(*) AS n FROM pelajaran WHERE mapel_id=%s",
+        "SELECT COUNT(*) AS n FROM gabung_mapel_item WHERE mapel_id=%s",
+        "SELECT COUNT(*) AS n FROM mapping_rapor WHERE mapel_id=%s",
+    ):
+        try:
+            if query(sql, (item_id,), one=True)["n"]:
+                return True
+        except Exception:
+            continue
+    return False
+
+
 @bp.route("/admin/mapel")
 @login_required
 def data_mapel():
+    q = (request.args.get("q") or "").strip()
+    per = request.args.get("per", 10, type=int) or 10
+    if per not in (10, 25, 50, 100):
+        per = 10
+    halaman = request.args.get("halaman", 1, type=int) or 1
+    if halaman < 1:
+        halaman = 1
+    urut = request.args.get("urut") or "kode"
+    arah = "DESC" if request.args.get("arah") == "desc" else "ASC"
+    where = ""
+    params = []
+    if q:
+        where = "WHERE m.kode LIKE %s OR m.nama LIKE %s"
+        like = f"%{q}%"
+        params = [like, like]
+    if urut == "nama":
+        order = f"m.nama {arah}, m.kode"
+    else:
+        urut = "kode"
+        order = (
+            "CASE WHEN m.kode REGEXP '^[0-9]+$' THEN CAST(m.kode AS UNSIGNED) ELSE 999999999 END "
+            f"{arah}, m.kode {arah}"
+        )
+    total = query(f"SELECT COUNT(*) AS n FROM mata_pelajaran m {where}", params, one=True)["n"]
+    halaman_max = max((total + per - 1) // per, 1)
+    if halaman > halaman_max:
+        halaman = halaman_max
+    awal = 0 if total == 0 else (halaman - 1) * per + 1
     rows = query(
-        """SELECT m.*, k.nama AS kelompok FROM mata_pelajaran m
-           LEFT JOIN kelompok_mapel k ON k.id=m.kelompok_id ORDER BY k.urutan, m.nama"""
+        f"""SELECT m.id, m.kode, m.nama FROM mata_pelajaran m
+            {where} ORDER BY {order} LIMIT %s OFFSET %s""",
+        (*params, per, (halaman - 1) * per),
     )
-    return render_template("list_mapel.html", rows=rows, nav="mapel")
+    akhir = 0 if total == 0 else awal + len(rows) - 1
+    return render_template(
+        "list_mapel.html",
+        rows=rows,
+        q=q,
+        per=per,
+        halaman=halaman,
+        total=total,
+        awal=awal,
+        akhir=akhir,
+        urut=urut,
+        arah=arah.lower(),
+        nav="mapel",
+    )
 
 
 @bp.route("/admin/mapel/form", methods=["GET", "POST"])
@@ -475,103 +843,229 @@ def form_mapel(item_id=None):
     row = query("SELECT * FROM mata_pelajaran WHERE id=%s", (item_id,), one=True) if item_id else None
     if item_id and not row:
         return _missing(row, "main.data_mapel")
-    kelompok = query("SELECT * FROM kelompok_mapel ORDER BY urutan")
     if request.method == "POST":
-        data = (
-            request.form.get("kode"),
-            request.form.get("nama"),
-            request.form.get("kelompok_id") or None,
-            to_int(request.form.get("kkm_default"), 75),
-        )
+        nama = (request.form.get("nama") or "").strip()
+        if not nama:
+            flash("Nama mata pelajaran wajib diisi.", "error")
+            return redirect(request.url)
         if item_id:
-            execute("UPDATE mata_pelajaran SET kode=%s,nama=%s,kelompok_id=%s,kkm_default=%s WHERE id=%s", (*data, item_id))
+            execute("UPDATE mata_pelajaran SET nama=%s WHERE id=%s", (nama, item_id))
             flash("Mata pelajaran diperbarui.", "success")
         else:
-            execute("INSERT INTO mata_pelajaran (kode,nama,kelompok_id,kkm_default) VALUES (%s,%s,%s,%s)", data)
-            flash("Mata pelajaran ditambahkan.", "success")
+            kode = (request.form.get("kode") or "").strip()
+            if not kode.isdigit() or query("SELECT id FROM mata_pelajaran WHERE kode=%s", (kode,), one=True):
+                kode = _kode_mapel_baru()
+            execute(
+                "INSERT INTO mata_pelajaran (kode, nama, kkm_default) VALUES (%s,%s,75)",
+                (kode, nama),
+            )
+            flash("Mata pelajaran disimpan.", "success")
+            if request.form.get("aksi") == "lagi":
+                return redirect(url_for("main.form_mapel"))
         return redirect(url_for("main.data_mapel"))
-    return render_template("form_mapel.html", row=row or {}, kelompok=kelompok, nav="mapel")
+    return render_template(
+        "form_mapel.html",
+        row=row or {},
+        kode=(row or {}).get("kode") or _kode_mapel_baru(),
+        nav="mapel",
+    )
 
 
 @bp.route("/admin/mapel/hapus/<int:item_id>", methods=["POST"])
 @login_required
 def hapus_mapel(item_id):
-    blocked = _in_use(
-        "SELECT COUNT(*) AS n FROM pelajaran WHERE mapel_id=%s",
-        (item_id,),
-        "Mata pelajaran masih dipakai di data pelajaran. Lepaskan dulu sebelum menghapus.",
-        "main.data_mapel",
-    )
-    if blocked:
-        return blocked
+    if _mapel_terpakai(item_id):
+        flash("Mata pelajaran masih dipakai. Lepaskan dulu sebelum menghapus.", "error")
+        return redirect(url_for("main.data_mapel"))
     execute("DELETE FROM mata_pelajaran WHERE id=%s", (item_id,))
     flash("Mata pelajaran dihapus.", "success")
     return redirect(url_for("main.data_mapel"))
 
 
+@bp.route("/admin/mapel/hapus-terpilih", methods=["POST"])
+@login_required
+def hapus_mapel_terpilih():
+    ids = [int(nilai) for nilai in request.form.getlist("id") if str(nilai).isdigit()]
+    if not ids:
+        flash("Pilih mata pelajaran yang akan dihapus.", "error")
+        return redirect(url_for("main.data_mapel"))
+    terhapus = 0
+    terpakai = 0
+    for item_id in ids:
+        if _mapel_terpakai(item_id):
+            terpakai += 1
+            continue
+        execute("DELETE FROM mata_pelajaran WHERE id=%s", (item_id,))
+        terhapus += 1
+    if terhapus:
+        flash(f"{terhapus} mata pelajaran dihapus.", "success")
+    if terpakai:
+        flash(f"{terpakai} mata pelajaran masih dipakai dan tidak dihapus.", "error")
+    return redirect(url_for("main.data_mapel"))
+
+
 # ---------- Pelajaran / pembelajaran ----------
+_GURU_NAMA = (
+    "TRIM(CONCAT("
+    "IF(g.gelar_depan IS NULL OR g.gelar_depan='', '', CONCAT(g.gelar_depan, ' ')),"
+    "IFNULL(g.nama, ''),"
+    "IF(g.gelar_belakang IS NULL OR g.gelar_belakang='', '', CONCAT(', ', g.gelar_belakang))"
+    "))"
+)
+
+
+def _isi_pelajaran():
+    kelas_id = request.form.get("kelas_id") or ""
+    mapel_id = request.form.get("mapel_id") or ""
+    guru_id = request.form.get("guru_id") or ""
+    if not kelas_id.isdigit() or not mapel_id.isdigit():
+        flash("Rombongan belajar dan mata pelajaran wajib dipilih.", "error")
+        return None
+    if guru_id and not guru_id.isdigit():
+        flash("Guru pengajar tidak valid.", "error")
+        return None
+    jam_teks = (request.form.get("jam_per_minggu") or "").strip()
+    if not jam_teks:
+        jam = None
+    else:
+        try:
+            jam = int(jam_teks)
+        except ValueError:
+            flash("Jam mengajar per minggu harus berupa angka.", "error")
+            return None
+        if jam < 0:
+            flash("Jam mengajar per minggu tidak boleh kurang dari 0.", "error")
+            return None
+    status = (request.form.get("status_kurikulum") or "").strip() or None
+    return int(kelas_id), int(mapel_id), int(guru_id) if guru_id else None, jam, status
+
+
 @bp.route("/admin/pelajaran")
 @login_required
 def data_pelajaran():
+    q = (request.args.get("q") or "").strip()
+    per = request.args.get("per", 10, type=int) or 10
+    if per not in (10, 25, 50, 100):
+        per = 10
+    halaman = request.args.get("halaman", 1, type=int) or 1
+    if halaman < 1:
+        halaman = 1
+    urut = request.args.get("urut") or "kelas"
+    arah = "DESC" if request.args.get("arah") == "desc" else "ASC"
     ta_id = _ta_id()
-    extra = ""
-    params = [ta_id]
-    if "admin" not in set(session.get("tugas") or []) and session.get("role") != "admin":
-        extra = " AND p.guru_id=%s"
+    where = ["p.tahun_ajaran_id=%s"]
+    params = [ta_id or 0]
+    if not _admin_sekolah():
+        where.append("p.guru_id=%s")
         params.append(session.get("guru_id") or 0)
-    rows = query(
-        """SELECT p.*, k.nama AS kelas_nama, m.nama AS mapel_nama, g.nama AS guru_nama
-           FROM pelajaran p
-           JOIN kelas k ON k.id=p.kelas_id
-           JOIN mata_pelajaran m ON m.id=p.mapel_id
-           JOIN guru g ON g.id=p.guru_id
-           WHERE p.tahun_ajaran_id=%s
-           """ + extra + " ORDER BY " + ORDER_KELAS_K + ", m.nama",
+    if q:
+        where.append("(k.nama LIKE %s OR m.nama LIKE %s OR g.nama LIKE %s)")
+        like = f"%{q}%"
+        params.extend([like, like, like])
+    if urut == "mapel":
+        order = f"m.nama {arah}, k.nama"
+    elif urut == "guru":
+        order = f"guru_nama {arah}, m.nama"
+    elif urut == "jam":
+        order = f"p.jam_per_minggu {arah}, m.nama"
+    else:
+        urut = "kelas"
+        order = f"{ORDER_KELAS_K} {arah}, m.nama"
+    saring = " AND ".join(where)
+    total = query(
+        f"""SELECT COUNT(*) AS n FROM pelajaran p
+            JOIN kelas k ON k.id=p.kelas_id
+            JOIN mata_pelajaran m ON m.id=p.mapel_id
+            LEFT JOIN guru g ON g.id=p.guru_id
+            WHERE {saring}""",
         params,
+        one=True,
+    )["n"] if ta_id else 0
+    halaman_max = max((total + per - 1) // per, 1)
+    if halaman > halaman_max:
+        halaman = halaman_max
+    awal = 0 if total == 0 else (halaman - 1) * per + 1
+    rows = query(
+        f"""SELECT p.id, p.jam_per_minggu, k.nama AS kelas_nama, m.nama AS mapel_nama,
+                   {_GURU_NAMA} AS guru_nama
+            FROM pelajaran p
+            JOIN kelas k ON k.id=p.kelas_id
+            JOIN mata_pelajaran m ON m.id=p.mapel_id
+            LEFT JOIN guru g ON g.id=p.guru_id
+            WHERE {saring} ORDER BY {order} LIMIT %s OFFSET %s""",
+        (*params, per, (halaman - 1) * per),
     ) if ta_id else []
-    return render_template("list_pelajaran.html", rows=rows, nav="pelajaran")
+    akhir = 0 if total == 0 else awal + len(rows) - 1
+    return render_template(
+        "list_pelajaran.html",
+        rows=rows,
+        q=q,
+        per=per,
+        halaman=halaman,
+        total=total,
+        awal=awal,
+        akhir=akhir,
+        urut=urut,
+        arah=arah.lower(),
+        nav="pelajaran",
+    )
 
 
 @bp.route("/admin/pelajaran/form", methods=["GET", "POST"])
 @bp.route("/admin/pelajaran/form/<int:item_id>", methods=["GET", "POST"])
 @login_required
 def form_pelajaran(item_id=None):
+    import pymysql
+
     row = query("SELECT * FROM pelajaran WHERE id=%s", (item_id,), one=True) if item_id else None
     if item_id and not row:
         return _missing(row, "main.data_pelajaran")
     kelas = query(f"SELECT id, nama FROM kelas ORDER BY {ORDER_KELAS}")
     mapel = query("SELECT id, nama FROM mata_pelajaran ORDER BY nama")
-    guru = query("SELECT id, nama FROM guru WHERE aktif=1 ORDER BY nama")
+    guru = query(
+        f"""SELECT id, {_GURU_NAMA} AS nama FROM guru g
+            WHERE aktif=1 OR id=%s ORDER BY nama""",
+        ((row or {}).get("guru_id") or 0,),
+    )
     if request.method == "POST":
         ta_id = _ta_id()
         if not ta_id:
             flash("Tahun ajaran aktif belum diatur.", "error")
             return redirect(url_for("main.data_pelajaran"))
-        data = (
-            ta_id,
-            request.form.get("kelas_id"),
-            request.form.get("mapel_id"),
-            request.form.get("guru_id"),
-            to_int(request.form.get("jam_per_minggu"), 2),
-        )
+        data = _isi_pelajaran()
+        if data is None:
+            return redirect(request.url)
         try:
             if item_id:
                 execute(
-                    "UPDATE pelajaran SET tahun_ajaran_id=%s,kelas_id=%s,mapel_id=%s,guru_id=%s,jam_per_minggu=%s WHERE id=%s",
-                    (*data, item_id),
+                    """UPDATE pelajaran SET tahun_ajaran_id=%s, kelas_id=%s, mapel_id=%s, guru_id=%s,
+                       jam_per_minggu=%s, status_kurikulum=%s WHERE id=%s""",
+                    (ta_id, *data, item_id),
                 )
                 flash("Pembelajaran diperbarui.", "success")
             else:
+                kode = (request.form.get("kode") or "").strip() or str(uuid4())
                 execute(
-                    "INSERT INTO pelajaran (tahun_ajaran_id,kelas_id,mapel_id,guru_id,jam_per_minggu) VALUES (%s,%s,%s,%s,%s)",
-                    data,
+                    """INSERT INTO pelajaran
+                       (kode, tahun_ajaran_id, kelas_id, mapel_id, guru_id, jam_per_minggu, status_kurikulum)
+                       VALUES (%s,%s,%s,%s,%s,%s,%s)""",
+                    (kode, ta_id, *data),
                 )
-                flash("Pembelajaran ditambahkan.", "success")
-        except Exception:
-            flash("Gagal menyimpan. Mapel itu sudah terdaftar di kelas yang sama, atau data tidak valid.", "error")
+                flash("Pembelajaran disimpan.", "success")
+                if request.form.get("aksi") == "lagi":
+                    return redirect(url_for("main.form_pelajaran"))
+        except pymysql.err.IntegrityError:
+            flash("Mapel itu sudah terdaftar di kelas yang sama pada tahun ajaran ini.", "error")
+            return redirect(request.url)
         return redirect(url_for("main.data_pelajaran"))
     return render_template(
-        "form_pelajaran.html", row=row or {}, kelas=kelas, mapel=mapel, guru=guru, nav="pelajaran"
+        "form_pelajaran.html",
+        row=row or {},
+        kode=(row or {}).get("kode") or str(uuid4()),
+        kelas=kelas,
+        mapel=mapel,
+        guru=guru,
+        nav="pelajaran",
     )
 
 
@@ -583,27 +1077,83 @@ def hapus_pelajaran(item_id):
     return redirect(url_for("main.data_pelajaran"))
 
 
+@bp.route("/admin/pelajaran/hapus-terpilih", methods=["POST"])
+@login_required
+def hapus_pelajaran_terpilih():
+    ids = [int(nilai) for nilai in request.form.getlist("id") if str(nilai).isdigit()]
+    if not ids:
+        flash("Pilih pembelajaran yang akan dihapus.", "error")
+        return redirect(url_for("main.data_pelajaran"))
+    tanda = ", ".join(["%s"] * len(ids))
+    execute(f"DELETE FROM pelajaran WHERE id IN ({tanda})", ids)
+    flash(f"{len(ids)} pembelajaran dihapus.", "success")
+    return redirect(url_for("main.data_pelajaran"))
+
+
 # ---------- Gabung mapel ----------
-@bp.route("/admin/gabung-mapel", methods=["GET", "POST"])
+@bp.route("/admin/gabung-mapel")
 @login_required
 def gabung_mapel():
+    q = (request.args.get("q") or "").strip()
+    per = request.args.get("per", 10, type=int) or 10
+    if per not in (10, 25, 50, 100):
+        per = 10
+    halaman = request.args.get("halaman", 1, type=int) or 1
+    if halaman < 1:
+        halaman = 1
+    arah = "DESC" if request.args.get("arah") == "desc" else "ASC"
+    where = ""
+    params = []
+    if q:
+        where = "WHERE nama_gabungan LIKE %s"
+        params = [f"%{q}%"]
+    total = query(f"SELECT COUNT(*) AS n FROM gabung_mapel {where}", params, one=True)["n"]
+    halaman_max = max((total + per - 1) // per, 1)
+    if halaman > halaman_max:
+        halaman = halaman_max
+    awal = 0 if total == 0 else (halaman - 1) * per + 1
+    rows = query(
+        f"""SELECT id, nama_gabungan FROM gabung_mapel {where}
+            ORDER BY nama_gabungan {arah}, id LIMIT %s OFFSET %s""",
+        (*params, per, (halaman - 1) * per),
+    )
+    akhir = 0 if total == 0 else awal + len(rows) - 1
+    return render_template(
+        "list_gabung.html",
+        rows=rows,
+        q=q,
+        per=per,
+        halaman=halaman,
+        total=total,
+        awal=awal,
+        akhir=akhir,
+        arah=arah.lower(),
+        nav="gabung",
+    )
+
+
+@bp.route("/admin/gabung-mapel/form", methods=["GET", "POST"])
+@bp.route("/admin/gabung-mapel/form/<int:item_id>", methods=["GET", "POST"])
+@login_required
+def form_gabung(item_id=None):
+    row = query("SELECT * FROM gabung_mapel WHERE id=%s", (item_id,), one=True) if item_id else None
+    if item_id and not row:
+        return _missing(row, "main.gabung_mapel")
     if request.method == "POST":
-        ids = request.form.getlist("mapel_id")
-        with transaction():
-            gid = execute("INSERT INTO gabung_mapel (nama_gabungan) VALUES (%s)", (request.form.get("nama_gabungan"),))
-            for mid in ids:
-                execute("INSERT INTO gabung_mapel_item (gabung_id, mapel_id) VALUES (%s,%s)", (gid, mid))
-        flash("Gabungan mapel disimpan.", "success")
+        nama = (request.form.get("nama_gabungan") or "").strip()
+        if not nama:
+            flash("Nama penggabungan mapel wajib diisi.", "error")
+            return redirect(request.url)
+        if item_id:
+            execute("UPDATE gabung_mapel SET nama_gabungan=%s WHERE id=%s", (nama, item_id))
+            flash("Gabungan mapel diperbarui.", "success")
+        else:
+            execute("INSERT INTO gabung_mapel (nama_gabungan) VALUES (%s)", (nama,))
+            flash("Gabungan mapel disimpan.", "success")
+            if request.form.get("aksi") == "lagi":
+                return redirect(url_for("main.form_gabung"))
         return redirect(url_for("main.gabung_mapel"))
-    rows = query("SELECT * FROM gabung_mapel ORDER BY id")
-    for r in rows:
-        items = query(
-            """SELECT m.nama FROM gabung_mapel_item i JOIN mata_pelajaran m ON m.id=i.mapel_id WHERE i.gabung_id=%s""",
-            (r["id"],),
-        )
-        r["items"] = ", ".join(x["nama"] for x in items)
-    mapel = query("SELECT id, nama FROM mata_pelajaran ORDER BY nama")
-    return render_template("list_gabung.html", rows=rows, mapel=mapel, nav="gabung")
+    return render_template("form_gabung.html", row=row or {}, nav="gabung")
 
 
 @bp.route("/admin/gabung-mapel/hapus/<int:item_id>", methods=["POST"])
@@ -615,51 +1165,321 @@ def hapus_gabung(item_id):
 
 
 # ---------- Mapping rapor ----------
-@bp.route("/admin/mapping-rapor", methods=["GET", "POST"])
+def _filter_mapping():
+    kurikulum = request.args.get("kurikulum") or request.form.get("kurikulum") or ""
+    tingkat = request.args.get("tingkat") or request.form.get("tingkat") or ""
+    q = (request.args.get("q") or request.form.get("q") or "").strip()
+    if kurikulum not in KURIKULUM_SEKOLAH:
+        kurikulum = ""
+    if tingkat not in TINGKAT_KELAS:
+        tingkat = ""
+    if not request.args and not request.form:
+        kurikulum, tingkat = "Kurikulum Merdeka", "7"
+    if request.values.get("kosong"):
+        kurikulum, tingkat = "", ""
+    return kurikulum, tingkat, q
+
+
+def _kembali_mapping():
+    kurikulum, tingkat, q = _filter_mapping()
+    return redirect(url_for(
+        "main.mapping_rapor",
+        kurikulum=kurikulum,
+        tingkat=tingkat,
+        q=q,
+        per=request.values.get("per") or 10,
+        urut=request.values.get("urut") or "",
+        arah=request.values.get("arah") or "asc",
+        kosong=1 if request.values.get("kosong") else None,
+    ))
+
+
+@bp.route("/admin/mapping-rapor")
 @login_required
 def mapping_rapor():
+    kurikulum, tingkat, q = _filter_mapping()
+    per = request.args.get("per", 10, type=int) or 10
+    if per not in (10, 25, 50, 100):
+        per = 10
+    halaman = request.args.get("halaman", 1, type=int) or 1
+    if halaman < 1:
+        halaman = 1
+    urut = request.args.get("urut") or "urutan"
+    arah = "DESC" if request.args.get("arah") == "desc" else "ASC"
+    where = ["1=1"]
+    params = []
+    if kurikulum:
+        where.append("mr.kurikulum=%s")
+        params.append(kurikulum)
+    if tingkat:
+        where.append("mr.tingkat=%s")
+        params.append(tingkat)
+    if q:
+        where.append("(m.nama LIKE %s OR mr.nama_lokal LIKE %s)")
+        like = f"%{q}%"
+        params.extend([like, like])
+    saring = " AND ".join(where)
+    order = f"m.nama {arah}, mr.urutan" if urut == "nama" else f"mr.urutan {arah}, m.nama"
+    if urut != "nama":
+        urut = "urutan"
+    total = query(
+        f"""SELECT COUNT(*) AS n FROM mapping_rapor mr
+            JOIN mata_pelajaran m ON m.id=mr.mapel_id
+            WHERE {saring}""",
+        params,
+        one=True,
+    )["n"]
+    halaman_max = max((total + per - 1) // per, 1)
+    if halaman > halaman_max:
+        halaman = halaman_max
+    awal = 0 if total == 0 else (halaman - 1) * per + 1
+    rows = query(
+        f"""SELECT mr.id, mr.nama_lokal, mr.urutan, mr.kelompok_id, mr.kurikulum, mr.tingkat,
+                   m.nama AS mapel_nama
+            FROM mapping_rapor mr
+            JOIN mata_pelajaran m ON m.id=mr.mapel_id
+            WHERE {saring}
+            ORDER BY {order} LIMIT %s OFFSET %s""",
+        (*params, per, (halaman - 1) * per),
+    )
+    akhir = 0 if total == 0 else awal + len(rows) - 1
+    return render_template(
+        "mapping_rapor.html",
+        rows=rows,
+        kelompok=query("SELECT id, nama FROM kelompok_mapel ORDER BY urutan, nama"),
+        kurikulum=kurikulum,
+        tingkat=tingkat,
+        kurikulum_opsi=KURIKULUM_SEKOLAH,
+        tingkat_opsi=TINGKAT_KELAS,
+        q=q,
+        per=per,
+        halaman=halaman,
+        total=total,
+        awal=awal,
+        akhir=akhir,
+        urut=urut,
+        arah=arah.lower(),
+        saring=int(bool(kurikulum)) + int(bool(tingkat)),
+        nav="mapping",
+    )
+
+
+@bp.route("/admin/mapping-rapor/form", methods=["GET", "POST"])
+@login_required
+def form_mapping():
+    mapel = query("SELECT id, nama, kelompok_id FROM mata_pelajaran ORDER BY nama")
+    kelompok = query("SELECT id, nama FROM kelompok_mapel ORDER BY urutan, nama")
     if request.method == "POST":
-        chosen = request.form.getlist("mapel_id")
-        with transaction():
-            execute("DELETE FROM mapping_rapor")
-            for mid in chosen:
-                urutan = to_int(request.form.get(f"urutan_{mid}"), 0)
-                execute("INSERT INTO mapping_rapor (mapel_id, tampil_rapor, urutan) VALUES (%s,1,%s)", (mid, urutan))
+        kurikulum = request.form.get("kurikulum") or ""
+        tingkat = request.form.get("tingkat") or ""
+        mapel_id = request.form.get("mapel_id") or ""
+        nama_lokal = (request.form.get("nama_lokal") or "").strip()
+        kelompok_id = request.form.get("kelompok_id") or ""
+        urutan_teks = (request.form.get("urutan") or "").strip()
+        if kurikulum not in KURIKULUM_SEKOLAH or tingkat not in TINGKAT_KELAS or not mapel_id.isdigit() or not nama_lokal:
+            flash("Kurikulum, tingkat, mata pelajaran, dan nama lokal wajib diisi.", "error")
+            return redirect(request.url)
+        if not urutan_teks.isdigit():
+            flash("No urut rapor wajib berupa angka.", "error")
+            return redirect(request.url)
+        if kelompok_id and not kelompok_id.isdigit():
+            kelompok_id = ""
+        if query(
+            "SELECT id FROM mapping_rapor WHERE kurikulum=%s AND tingkat=%s AND mapel_id=%s",
+            (kurikulum, tingkat, int(mapel_id)),
+            one=True,
+        ):
+            flash("Mata pelajaran itu sudah dimapping pada kurikulum dan tingkat yang sama.", "error")
+            return redirect(request.url)
+        execute(
+            """INSERT INTO mapping_rapor
+               (mapel_id, tampil_rapor, urutan, kurikulum, tingkat, nama_lokal, kelompok_id)
+               VALUES (%s,1,%s,%s,%s,%s,%s)""",
+            (int(mapel_id), int(urutan_teks), kurikulum, tingkat, nama_lokal, int(kelompok_id) if kelompok_id else None),
+        )
         flash("Mapping rapor disimpan.", "success")
-        return redirect(url_for("main.mapping_rapor"))
-    mapel = query("SELECT * FROM mata_pelajaran ORDER BY nama")
-    mapped = {r["mapel_id"]: r for r in query("SELECT * FROM mapping_rapor")}
-    return render_template("mapping_rapor.html", mapel=mapel, mapped=mapped, nav="mapping")
+        if request.form.get("aksi") == "lagi":
+            return redirect(url_for("main.form_mapping"))
+        return redirect(url_for("main.mapping_rapor", kurikulum=kurikulum, tingkat=tingkat))
+    return render_template(
+        "form_mapping.html",
+        mapel=mapel,
+        kelompok=kelompok,
+        kurikulum_opsi=KURIKULUM_SEKOLAH,
+        tingkat_opsi=TINGKAT_KELAS,
+        nav="mapping",
+    )
+
+
+@bp.route("/admin/mapping-rapor/ubah/<int:item_id>", methods=["POST"])
+@login_required
+def ubah_mapping(item_id):
+    if "nama_lokal" in request.form:
+        nama = (request.form.get("nama_lokal") or "").strip()
+        if not nama:
+            flash("Nama lokal wajib diisi.", "error")
+        else:
+            execute("UPDATE mapping_rapor SET nama_lokal=%s WHERE id=%s", (nama, item_id))
+    if "kelompok_id" in request.form:
+        kelompok_id = request.form.get("kelompok_id") or ""
+        execute(
+            "UPDATE mapping_rapor SET kelompok_id=%s WHERE id=%s",
+            (int(kelompok_id) if kelompok_id.isdigit() else None, item_id),
+        )
+    if "urutan" in request.form:
+        urutan_teks = (request.form.get("urutan") or "").strip()
+        if urutan_teks.isdigit():
+            execute("UPDATE mapping_rapor SET urutan=%s WHERE id=%s", (int(urutan_teks), item_id))
+        else:
+            flash("No urut rapor wajib berupa angka.", "error")
+    return _kembali_mapping()
+
+
+@bp.route("/admin/mapping-rapor/hapus", methods=["POST"])
+@login_required
+def hapus_mapping():
+    ids = [int(nilai) for nilai in request.form.getlist("id") if str(nilai).isdigit()]
+    if not ids:
+        flash("Pilih mapping yang akan dihapus.", "error")
+        return _kembali_mapping()
+    tanda = ", ".join(["%s"] * len(ids))
+    execute(f"DELETE FROM mapping_rapor WHERE id IN ({tanda})", ids)
+    flash(f"{len(ids)} mapping rapor dihapus.", "success")
+    return _kembali_mapping()
 
 
 # ---------- Ekskul ----------
-@bp.route("/admin/ekskul", methods=["GET", "POST"])
+def _kode_semester():
+    ta = query("SELECT tahun, semester FROM tahun_ajaran WHERE aktif=1 LIMIT 1", one=True)
+    if not ta:
+        return "-"
+    angka = "".join(ch for ch in str(ta["tahun"] or "") if ch.isdigit())
+    awal = angka[:4]
+    if not awal:
+        return str(ta["semester"] or "-")
+    return f"{awal}{ta['semester'] or ''}"
+
+
+def _nama_guru(guru_id):
+    if not guru_id:
+        return ""
+    row = query(f"SELECT {_GURU_NAMA} AS nama FROM guru g WHERE id=%s", (guru_id,), one=True)
+    return (row or {}).get("nama") or ""
+
+
+def _isi_ekskul():
+    nama = (request.form.get("nama") or "").strip()
+    if not nama:
+        flash("Nama ekskul wajib diisi.", "error")
+        return None
+    pembina_id = request.form.get("pembina_id") or ""
+    if pembina_id and not pembina_id.isdigit():
+        pembina_id = ""
+    nama_pembina = (request.form.get("nama_pembina") or "").strip()
+    if pembina_id and not nama_pembina:
+        nama_pembina = _nama_guru(int(pembina_id))
+    return nama, int(pembina_id) if pembina_id else None, nama_pembina or None
+
+
+@bp.route("/admin/ekskul")
 @login_required
 def data_ekskul():
-    if request.method == "POST":
-        if "admin" not in set(session.get("tugas") or []) and session.get("role") != "admin":
-            flash("Hanya admin yang dapat menambah ekstrakurikuler.", "error")
-            return redirect(url_for("main.data_ekskul"))
-        execute(
-            "INSERT INTO ekstrakurikuler (nama, pembina_id) VALUES (%s,%s)",
-            (request.form.get("nama"), request.form.get("pembina_id") or None),
-        )
-        flash("Ekstrakurikuler ditambahkan.", "success")
-        return redirect(url_for("main.data_ekskul"))
-    if "admin" not in set(session.get("tugas") or []) and session.get("role") != "admin":
-        rows = query(
-            """SELECT e.*, g.nama AS pembina FROM ekstrakurikuler e
-               LEFT JOIN guru g ON g.id=e.pembina_id
-               WHERE e.pembina_id=%s ORDER BY e.nama""",
-            (session.get("guru_id") or 0,),
-        )
+    q = (request.args.get("q") or "").strip()
+    pembina = request.args.get("pembina_id") or ""
+    if not pembina.isdigit():
+        pembina = ""
+    per = request.args.get("per", 10, type=int) or 10
+    if per not in (10, 25, 50, 100):
+        per = 10
+    halaman = request.args.get("halaman", 1, type=int) or 1
+    if halaman < 1:
+        halaman = 1
+    urut = request.args.get("urut") or "nama"
+    arah = "DESC" if request.args.get("arah") == "desc" else "ASC"
+    where = ["1=1"]
+    params = []
+    if not _admin_sekolah():
+        where.append("e.pembina_id=%s")
+        params.append(session.get("guru_id") or 0)
+    if q:
+        where.append("(e.nama LIKE %s OR e.nama_pembina LIKE %s OR g.nama LIKE %s)")
+        like = f"%{q}%"
+        params.extend([like, like, like])
+    if pembina:
+        where.append("e.pembina_id=%s")
+        params.append(int(pembina))
+    if urut == "pembina":
+        order = f"pembina {arah}, e.nama"
+    elif urut == "peserta":
+        order = f"peserta {arah}, e.nama"
     else:
-        rows = query(
-            """SELECT e.*, g.nama AS pembina FROM ekstrakurikuler e
-               LEFT JOIN guru g ON g.id=e.pembina_id ORDER BY e.nama"""
-        )
-    guru = query("SELECT id, nama FROM guru WHERE aktif=1 ORDER BY nama")
-    return render_template("list_ekskul.html", rows=rows, guru=guru, nav="ekskul")
+        urut = "nama"
+        order = f"e.nama {arah}"
+    saring = " AND ".join(where)
+    dari = """FROM ekstrakurikuler e
+              LEFT JOIN guru g ON g.id=e.pembina_id"""
+    total = query(f"SELECT COUNT(*) AS n {dari} WHERE {saring}", params, one=True)["n"]
+    halaman_max = max((total + per - 1) // per, 1)
+    if halaman > halaman_max:
+        halaman = halaman_max
+    awal = 0 if total == 0 else (halaman - 1) * per + 1
+    rows = query(
+        f"""SELECT e.id, e.nama, e.pembina_id,
+                   COALESCE(NULLIF(e.nama_pembina, ''), {_GURU_NAMA}) AS pembina,
+                   (SELECT COUNT(*) FROM peserta_ekskul p WHERE p.ekskul_id=e.id) AS peserta
+            {dari}
+            WHERE {saring}
+            ORDER BY {order} LIMIT %s OFFSET %s""",
+        (*params, per, (halaman - 1) * per),
+    )
+    akhir = 0 if total == 0 else awal + len(rows) - 1
+    return render_template(
+        "list_ekskul.html",
+        rows=rows,
+        guru=query(f"SELECT id, {_GURU_NAMA} AS nama FROM guru g WHERE aktif=1 ORDER BY nama"),
+        q=q,
+        pembina_id=pembina,
+        per=per,
+        halaman=halaman,
+        total=total,
+        awal=awal,
+        akhir=akhir,
+        urut=urut,
+        arah=arah.lower(),
+        semester=_kode_semester(),
+        saring=int(bool(pembina)),
+        nav="ekskul",
+    )
+
+
+@bp.route("/admin/ekskul/form", methods=["GET", "POST"])
+@bp.route("/admin/ekskul/form/<int:item_id>", methods=["GET", "POST"])
+@login_required
+def form_ekskul(item_id=None):
+    row = query("SELECT * FROM ekstrakurikuler WHERE id=%s", (item_id,), one=True) if item_id else None
+    if item_id and not row:
+        return _missing(row, "main.data_ekskul")
+    guru = query(f"SELECT id, {_GURU_NAMA} AS nama FROM guru g WHERE aktif=1 OR id=%s ORDER BY nama", ((row or {}).get("pembina_id") or 0,))
+    if request.method == "POST":
+        data = _isi_ekskul()
+        if data is None:
+            return redirect(request.url)
+        if item_id:
+            execute(
+                "UPDATE ekstrakurikuler SET nama=%s, pembina_id=%s, nama_pembina=%s WHERE id=%s",
+                (*data, item_id),
+            )
+            flash("Ekstrakurikuler diperbarui.", "success")
+        else:
+            execute(
+                "INSERT INTO ekstrakurikuler (nama, pembina_id, nama_pembina) VALUES (%s,%s,%s)",
+                data,
+            )
+            flash("Ekstrakurikuler disimpan.", "success")
+            if request.form.get("aksi") == "lagi":
+                return redirect(url_for("main.form_ekskul"))
+        return redirect(url_for("main.data_ekskul"))
+    return render_template("form_ekskul.html", row=row or {}, guru=guru, nav="ekskul")
 
 
 @bp.route("/admin/ekskul/hapus/<int:item_id>", methods=["POST"])
@@ -670,6 +1490,81 @@ def hapus_ekskul(item_id):
     return redirect(url_for("main.data_ekskul"))
 
 
+@bp.route("/admin/ekskul/hapus-terpilih", methods=["POST"])
+@login_required
+def hapus_ekskul_terpilih():
+    ids = [int(nilai) for nilai in request.form.getlist("id") if str(nilai).isdigit()]
+    if not ids:
+        flash("Pilih ekstra kurikuler yang akan dihapus.", "error")
+        return redirect(url_for("main.data_ekskul"))
+    tanda = ", ".join(["%s"] * len(ids))
+    execute(f"DELETE FROM ekstrakurikuler WHERE id IN ({tanda})", ids)
+    flash(f"{len(ids)} ekstra kurikuler dihapus.", "success")
+    return redirect(url_for("main.data_ekskul"))
+
+
+@bp.route("/admin/ekskul/<int:item_id>/peserta", methods=["GET", "POST"])
+@login_required
+def peserta_ekskul(item_id):
+    ekskul = query("SELECT * FROM ekstrakurikuler WHERE id=%s", (item_id,), one=True)
+    if not ekskul:
+        return _missing(ekskul, "main.data_ekskul")
+    if not _admin_sekolah() and ekskul["pembina_id"] != session.get("guru_id"):
+        flash("Ekstrakurikuler ini bukan tugas Anda.", "error")
+        return redirect(url_for("main.data_ekskul"))
+    kelas_id = request.values.get("kelas_id") or ""
+    if not str(kelas_id).isdigit():
+        kelas_id = ""
+    if request.method == "POST" and kelas_id:
+        dipilih = {int(nilai) for nilai in request.form.getlist("siswa_id") if str(nilai).isdigit()}
+        siswa_kelas = query("SELECT id FROM siswa WHERE kelas_id=%s", (int(kelas_id),))
+        for siswa in siswa_kelas:
+            if siswa["id"] in dipilih:
+                ada = query(
+                    "SELECT id FROM peserta_ekskul WHERE ekskul_id=%s AND siswa_id=%s",
+                    (item_id, siswa["id"]),
+                    one=True,
+                )
+                if not ada:
+                    execute(
+                        "INSERT INTO peserta_ekskul (ekskul_id, siswa_id) VALUES (%s,%s)",
+                        (item_id, siswa["id"]),
+                    )
+            else:
+                execute(
+                    "DELETE FROM peserta_ekskul WHERE ekskul_id=%s AND siswa_id=%s",
+                    (item_id, siswa["id"]),
+                )
+        flash("Peserta ekskul disimpan.", "success")
+        return redirect(url_for("main.peserta_ekskul", item_id=item_id, kelas_id=kelas_id))
+    anggota = query(
+        f"""SELECT s.id, s.nama, s.nis, k.nama AS kelas_nama
+            FROM peserta_ekskul p
+            JOIN siswa s ON s.id=p.siswa_id
+            LEFT JOIN kelas k ON k.id=s.kelas_id
+            WHERE p.ekskul_id=%s
+            ORDER BY {ORDER_KELAS_K}, s.nama""",
+        (item_id,),
+    )
+    calon = []
+    if kelas_id:
+        calon = query(
+            """SELECT s.id, s.nama, s.nis,
+                      EXISTS(SELECT 1 FROM peserta_ekskul p WHERE p.ekskul_id=%s AND p.siswa_id=s.id) AS ikut
+               FROM siswa s WHERE s.kelas_id=%s ORDER BY s.nama""",
+            (item_id, int(kelas_id)),
+        )
+    return render_template(
+        "peserta_ekskul.html",
+        ekskul=ekskul,
+        anggota=anggota,
+        calon=calon,
+        kelas=query(f"SELECT id, nama FROM kelas ORDER BY {ORDER_KELAS}"),
+        kelas_id=kelas_id,
+        nav="ekskul",
+    )
+
+
 # ---------- Tryout ----------
 @bp.route("/admin/tryout", methods=["GET", "POST"])
 @login_required
@@ -677,7 +1572,7 @@ def data_tryout():
     if request.method == "POST":
         execute(
             "INSERT INTO tryout (nama, tanggal, tingkat) VALUES (%s,%s,%s)",
-            (request.form.get("nama"), request.form.get("tanggal") or None, request.form.get("tingkat") or "XII"),
+            (request.form.get("nama"), request.form.get("tanggal") or None, request.form.get("tingkat") if request.form.get("tingkat") in TINGKAT_KELAS else "9"),
         )
         flash("Tryout ditambahkan.", "success")
         return redirect(url_for("main.data_tryout"))
@@ -709,7 +1604,7 @@ def perencanaan():
            FROM pelajaran pel
            JOIN kelas k ON k.id=pel.kelas_id
            JOIN mata_pelajaran m ON m.id=pel.mapel_id
-           JOIN guru g ON g.id=pel.guru_id
+           LEFT JOIN guru g ON g.id=pel.guru_id
            LEFT JOIN perencanaan_penilaian r ON r.pelajaran_id=pel.id
            WHERE pel.tahun_ajaran_id=%s
            """ + extra + " ORDER BY k.nama, m.nama",
@@ -749,18 +1644,99 @@ def simpan_perencanaan(pelajaran_id):
 
 
 # ---------- Tahfiz ----------
-@bp.route("/admin/tahfiz/aspek", methods=["GET", "POST"])
+def _isi_aspek():
+    nama = (request.form.get("nama") or "").strip()
+    if not nama:
+        flash("Nama aspek wajib diisi.", "error")
+        return None
+    if len(nama) > 150:
+        flash("Nama aspek terlalu panjang.", "error")
+        return None
+    mentah = (request.form.get("urutan") or "").strip()
+    if not mentah:
+        flash("Urutan tampilan wajib diisi.", "error")
+        return None
+    try:
+        urutan = int(mentah)
+    except ValueError:
+        flash("Urutan tampilan harus angka.", "error")
+        return None
+    return nama, urutan, 1 if request.form.get("aktif") else 0
+
+
+@bp.route("/admin/tahfiz/aspek")
 @login_required
 def aspek_tahfiz():
+    q = (request.args.get("q") or "").strip()
+    per = request.args.get("per", 10, type=int) or 10
+    if per not in (10, 25, 50, 100):
+        per = 10
+    halaman = request.args.get("halaman", 1, type=int) or 1
+    if halaman < 1:
+        halaman = 1
+    urut = "nama" if request.args.get("urut") == "nama" else "urutan"
+    arah = "DESC" if request.args.get("arah") == "desc" else "ASC"
+    where = ["1=1"]
+    params = []
+    if q:
+        where.append("nama LIKE %s")
+        params.append(f"%{q}%")
+    saring = " AND ".join(where)
+    order = f"nama {arah}, urutan, id" if urut == "nama" else f"urutan {arah}, id"
+    total = query(f"SELECT COUNT(*) AS n FROM aspek_tahfiz WHERE {saring}", params, one=True)["n"]
+    halaman_max = max((total + per - 1) // per, 1)
+    if halaman > halaman_max:
+        halaman = halaman_max
+    awal = 0 if total == 0 else (halaman - 1) * per + 1
+    rows = query(
+        f"""SELECT id, nama, jenis, kkm, urutan, aktif, dibuat
+            FROM aspek_tahfiz WHERE {saring}
+            ORDER BY {order} LIMIT %s OFFSET %s""",
+        (*params, per, (halaman - 1) * per),
+    )
+    akhir = 0 if total == 0 else awal + len(rows) - 1
+    return render_template(
+        "list_aspek.html",
+        rows=rows,
+        q=q,
+        per=per,
+        halaman=halaman,
+        total=total,
+        awal=awal,
+        akhir=akhir,
+        urut=urut,
+        arah=arah.lower(),
+        nav="aspek",
+    )
+
+
+@bp.route("/admin/tahfiz/aspek/form", methods=["GET", "POST"])
+@bp.route("/admin/tahfiz/aspek/form/<int:item_id>", methods=["GET", "POST"])
+@login_required
+def form_aspek(item_id=None):
+    row = query("SELECT * FROM aspek_tahfiz WHERE id=%s", (item_id,), one=True) if item_id else None
+    if item_id and not row:
+        return _missing(row, "main.aspek_tahfiz")
     if request.method == "POST":
-        execute(
-            "INSERT INTO aspek_tahfiz (nama, jenis, kkm) VALUES (%s,%s,%s)",
-            (request.form.get("nama"), request.form.get("jenis") or "Hafalan", to_int(request.form.get("kkm"), 75)),
-        )
-        flash("Aspek tahfiz ditambahkan.", "success")
+        data = _isi_aspek()
+        if data is None:
+            return redirect(request.url)
+        if item_id:
+            execute(
+                "UPDATE aspek_tahfiz SET nama=%s, urutan=%s, aktif=%s WHERE id=%s",
+                (*data, item_id),
+            )
+            flash("Aspek tahfiz diperbarui.", "success")
+        else:
+            execute(
+                "INSERT INTO aspek_tahfiz (nama, jenis, kkm, urutan, aktif, dibuat) VALUES (%s,'Hafalan',75,%s,%s,NOW())",
+                data,
+            )
+            flash("Aspek tahfiz disimpan.", "success")
+            if request.form.get("aksi") == "lagi":
+                return redirect(url_for("main.form_aspek"))
         return redirect(url_for("main.aspek_tahfiz"))
-    rows = query("SELECT * FROM aspek_tahfiz ORDER BY id")
-    return render_template("list_aspek.html", rows=rows, nav="aspek")
+    return render_template("form_aspek.html", row=row or {}, nav="aspek")
 
 
 @bp.route("/admin/tahfiz/aspek/hapus/<int:item_id>", methods=["POST"])
@@ -782,60 +1758,272 @@ def hapus_aspek(item_id):
     return redirect(url_for("main.aspek_tahfiz"))
 
 
-@bp.route("/admin/tahfiz/mapping", methods=["GET", "POST"])
+@bp.route("/admin/tahfiz/aspek/hapus-terpilih", methods=["POST"])
+@login_required
+def hapus_aspek_terpilih():
+    ids = [int(nilai) for nilai in request.form.getlist("id") if str(nilai).isdigit()]
+    if not ids:
+        flash("Pilih aspek yang akan dihapus.", "error")
+        return redirect(url_for("main.aspek_tahfiz"))
+    bebas = []
+    tertahan = 0
+    for item_id in ids:
+        dipakai = query(
+            """SELECT (
+                 (SELECT COUNT(*) FROM mapping_guru_tahfiz WHERE aspek_id=%s) +
+                 (SELECT COUNT(*) FROM nilai_tahfiz WHERE aspek_id=%s)
+               ) AS n""",
+            (item_id, item_id),
+            one=True,
+        )["n"]
+        if dipakai:
+            tertahan += 1
+        else:
+            bebas.append(item_id)
+    if bebas:
+        tanda = ", ".join(["%s"] * len(bebas))
+        execute(f"DELETE FROM aspek_tahfiz WHERE id IN ({tanda})", bebas)
+        flash(f"{len(bebas)} aspek dihapus.", "success")
+    if tertahan:
+        flash("Sebagian aspek masih dipakai di mapping guru atau nilai tahfiz.", "error")
+    return redirect(url_for("main.aspek_tahfiz"))
+
+
+def _pasangan_mapping(guru_id, kelas_id, kecuali=None):
+    sql = "SELECT id FROM mapping_guru_tahfiz WHERE guru_id=%s AND kelas_id=%s"
+    params = [guru_id, kelas_id]
+    if kecuali:
+        sql += " AND NOT (guru_id=%s AND kelas_id=%s)"
+        params.extend(kecuali)
+    return query(sql, params, one=True)
+
+
+def _isi_mapping_tahfiz():
+    guru_id = request.form.get("guru_id") or ""
+    kelas_id = request.form.get("kelas_id") or ""
+    if not guru_id.isdigit() or not kelas_id.isdigit():
+        flash("Guru dan rombel wajib dipilih.", "error")
+        return None
+    return int(guru_id), int(kelas_id)
+
+
+@bp.route("/admin/tahfiz/mapping")
 @login_required
 def mapping_tahfiz():
-    if request.method == "POST":
-        execute(
-            "INSERT INTO mapping_guru_tahfiz (guru_id,kelas_id,aspek_id) VALUES (%s,%s,%s)",
-            (request.form.get("guru_id"), request.form.get("kelas_id"), request.form.get("aspek_id")),
-        )
-        flash("Mapping guru tahfiz disimpan.", "success")
-        return redirect(url_for("main.mapping_tahfiz"))
+    q = (request.args.get("q") or "").strip()
+    per = request.args.get("per", 10, type=int) or 10
+    if per not in (10, 25, 50, 100):
+        per = 10
+    halaman = request.args.get("halaman", 1, type=int) or 1
+    if halaman < 1:
+        halaman = 1
+    urut = "kelas" if request.args.get("urut") == "kelas" else "guru"
+    arah = "DESC" if request.args.get("arah") == "desc" else "ASC"
+    where = ["1=1"]
+    params = []
+    if q:
+        where.append(f"({_GURU_NAMA} LIKE %s OR k.nama LIKE %s)")
+        like = f"%{q}%"
+        params.extend([like, like])
+    saring = " AND ".join(where)
+    order = f"k.nama {arah}, guru_nama" if urut == "kelas" else f"guru_nama {arah}, k.nama"
+    dari = f"""FROM mapping_guru_tahfiz m
+               JOIN guru g ON g.id=m.guru_id
+               JOIN kelas k ON k.id=m.kelas_id
+               WHERE {saring}"""
+    total = query(
+        f"SELECT COUNT(*) AS n FROM (SELECT m.guru_id, m.kelas_id {dari} GROUP BY m.guru_id, m.kelas_id) x",
+        params,
+        one=True,
+    )["n"]
+    halaman_max = max((total + per - 1) // per, 1)
+    if halaman > halaman_max:
+        halaman = halaman_max
+    awal = 0 if total == 0 else (halaman - 1) * per + 1
     rows = query(
-        """SELECT m.id, g.nama AS guru_nama, k.nama AS kelas_nama, a.nama AS aspek_nama
-           FROM mapping_guru_tahfiz m
-           JOIN guru g ON g.id=m.guru_id
-           JOIN kelas k ON k.id=m.kelas_id
-           JOIN aspek_tahfiz a ON a.id=m.aspek_id
-           ORDER BY k.nama"""
+        f"""SELECT MIN(m.id) AS id, {_GURU_NAMA} AS guru_nama, k.nama AS kelas_nama, MIN(m.dibuat) AS dibuat
+            {dari}
+            GROUP BY m.guru_id, m.kelas_id, g.gelar_depan, g.nama, g.gelar_belakang, k.nama
+            ORDER BY {order} LIMIT %s OFFSET %s""",
+        (*params, per, (halaman - 1) * per),
     )
+    akhir = 0 if total == 0 else awal + len(rows) - 1
     return render_template(
         "mapping_tahfiz.html",
         rows=rows,
-        guru=query("SELECT id,nama FROM guru WHERE aktif=1 ORDER BY nama"),
-        kelas=query(f"SELECT id,nama FROM kelas ORDER BY {ORDER_KELAS}"),
-        aspek=query("SELECT id,nama FROM aspek_tahfiz"),
+        q=q,
+        per=per,
+        halaman=halaman,
+        total=total,
+        awal=awal,
+        akhir=akhir,
+        urut=urut,
+        arah=arah.lower(),
         nav="maptahfiz",
     )
+
+
+@bp.route("/admin/tahfiz/mapping/form", methods=["GET", "POST"])
+@bp.route("/admin/tahfiz/mapping/form/<int:item_id>", methods=["GET", "POST"])
+@login_required
+def form_mapping_tahfiz(item_id=None):
+    row = None
+    if item_id:
+        row = query(
+            f"""SELECT m.id, m.guru_id, m.kelas_id
+                FROM mapping_guru_tahfiz m WHERE m.id=%s""",
+            (item_id,),
+            one=True,
+        )
+        if not row:
+            return _missing(row, "main.mapping_tahfiz")
+    if request.method == "POST":
+        data = _isi_mapping_tahfiz()
+        if data is None:
+            return redirect(request.url)
+        guru_id, kelas_id = data
+        if item_id:
+            lama = query("SELECT guru_id, kelas_id FROM mapping_guru_tahfiz WHERE id=%s", (item_id,), one=True)
+            if _pasangan_mapping(guru_id, kelas_id, (lama["guru_id"], lama["kelas_id"])):
+                flash("Guru ini sudah dipetakan ke rombel tersebut.", "error")
+                return redirect(request.url)
+            execute(
+                "UPDATE mapping_guru_tahfiz SET guru_id=%s, kelas_id=%s WHERE guru_id=%s AND kelas_id=%s",
+                (guru_id, kelas_id, lama["guru_id"], lama["kelas_id"]),
+            )
+            flash("Mapping guru tahfiz diperbarui.", "success")
+        else:
+            if _pasangan_mapping(guru_id, kelas_id):
+                flash("Guru ini sudah dipetakan ke rombel tersebut.", "error")
+                return redirect(request.url)
+            aspek = query("SELECT id FROM aspek_tahfiz WHERE aktif=1 ORDER BY urutan, id LIMIT 1", one=True)
+            if not aspek:
+                flash("Buat aspek tahfiz terlebih dahulu.", "error")
+                return redirect(url_for("main.aspek_tahfiz"))
+            execute(
+                "INSERT INTO mapping_guru_tahfiz (guru_id, kelas_id, aspek_id, dibuat) VALUES (%s,%s,%s,NOW())",
+                (guru_id, kelas_id, aspek["id"]),
+            )
+            flash("Mapping guru tahfiz disimpan.", "success")
+            if request.form.get("aksi") == "lagi":
+                return redirect(url_for("main.form_mapping_tahfiz"))
+        return redirect(url_for("main.mapping_tahfiz"))
+    guru = query(
+        f"""SELECT id, {_GURU_NAMA} AS nama FROM guru g
+            WHERE aktif=1 OR id=%s ORDER BY nama""",
+        ((row or {}).get("guru_id") or 0,),
+    )
+    kelas = query(f"SELECT id, nama FROM kelas ORDER BY {ORDER_KELAS}")
+    return render_template("form_mapping_tahfiz.html", row=row or {}, guru=guru, kelas=kelas, nav="maptahfiz")
 
 
 @bp.route("/admin/tahfiz/mapping/hapus/<int:item_id>", methods=["POST"])
 @login_required
 def hapus_mapping_tahfiz(item_id):
-    execute("DELETE FROM mapping_guru_tahfiz WHERE id=%s", (item_id,))
+    row = query("SELECT guru_id, kelas_id FROM mapping_guru_tahfiz WHERE id=%s", (item_id,), one=True)
+    if row:
+        execute(
+            "DELETE FROM mapping_guru_tahfiz WHERE guru_id=%s AND kelas_id=%s",
+            (row["guru_id"], row["kelas_id"]),
+        )
     flash("Mapping dihapus.", "success")
     return redirect(url_for("main.mapping_tahfiz"))
+
+
+@bp.route("/admin/tahfiz/mapping/hapus-terpilih", methods=["POST"])
+@login_required
+def hapus_mapping_tahfiz_terpilih():
+    ids = [int(nilai) for nilai in request.form.getlist("id") if str(nilai).isdigit()]
+    if not ids:
+        flash("Pilih mapping yang akan dihapus.", "error")
+        return redirect(url_for("main.mapping_tahfiz"))
+    for item_id in ids:
+        row = query("SELECT guru_id, kelas_id FROM mapping_guru_tahfiz WHERE id=%s", (item_id,), one=True)
+        if row:
+            execute(
+                "DELETE FROM mapping_guru_tahfiz WHERE guru_id=%s AND kelas_id=%s",
+                (row["guru_id"], row["kelas_id"]),
+            )
+    flash(f"{len(ids)} mapping dihapus.", "success")
+    return redirect(url_for("main.mapping_tahfiz"))
+
+
+def _teks_tanggal(nilai):
+    if not nilai or not hasattr(nilai, "day"):
+        return ""
+    bulan = (
+        "", "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+        "Juli", "Agustus", "September", "Oktober", "November", "Desember",
+    )
+    return f"{nilai.day} {bulan[nilai.month]} {nilai.year}"
+
+
+def _isi_pengaturan_tahfiz():
+    bidang = {
+        "tanggal_hijriah": "Tanggal Hijriah Rapor",
+        "tanggal_masehi": "Tanggal Masehi Rapor",
+        "tempat_cetak": "Tempat Cetak Rapor",
+        "nama_kepala": "Nama Kepala Sekolah",
+        "nbm_kepala": "NBM Kepala Sekolah",
+    }
+    batas = {
+        "tanggal_hijriah": 80,
+        "tanggal_masehi": 80,
+        "tempat_cetak": 120,
+        "nama_kepala": 150,
+        "nbm_kepala": 40,
+    }
+    hasil = []
+    for kunci, label in bidang.items():
+        nilai = (request.form.get(kunci) or "").strip()
+        if not nilai:
+            flash(f"{label} wajib diisi.", "error")
+            return None
+        if len(nilai) > batas[kunci]:
+            flash(f"{label} terlalu panjang.", "error")
+            return None
+        hasil.append(nilai)
+    return tuple(hasil)
 
 
 @bp.route("/admin/tahfiz/pengaturan", methods=["GET", "POST"])
 @login_required
 def pengaturan_tahfiz():
     if request.method == "POST":
+        data = _isi_pengaturan_tahfiz()
+        if data is None:
+            return redirect(url_for("main.pengaturan_tahfiz"))
         row = query("SELECT id FROM pengaturan_rapor_tahfiz LIMIT 1", one=True)
-        data = (
-            1 if request.form.get("tampilkan") else 0,
-            request.form.get("judul") or "Rapor Tahfiz",
-            request.form.get("keterangan"),
-        )
         if row:
-            execute("UPDATE pengaturan_rapor_tahfiz SET tampilkan=%s,judul=%s,keterangan=%s WHERE id=%s", (*data, row["id"]))
+            execute(
+                """UPDATE pengaturan_rapor_tahfiz
+                   SET tanggal_hijriah=%s, tanggal_masehi=%s, tempat_cetak=%s, nama_kepala=%s, nbm_kepala=%s
+                   WHERE id=%s""",
+                (*data, row["id"]),
+            )
         else:
-            execute("INSERT INTO pengaturan_rapor_tahfiz (tampilkan,judul,keterangan) VALUES (%s,%s,%s)", data)
+            execute(
+                """INSERT INTO pengaturan_rapor_tahfiz
+                   (tampilkan, judul, tanggal_hijriah, tanggal_masehi, tempat_cetak, nama_kepala, nbm_kepala)
+                   VALUES (1,'Rapor Tahfiz',%s,%s,%s,%s,%s)""",
+                data,
+            )
         flash("Pengaturan rapor tahfiz disimpan.", "success")
         return redirect(url_for("main.pengaturan_tahfiz"))
     row = query("SELECT * FROM pengaturan_rapor_tahfiz LIMIT 1", one=True) or {}
-    return render_template("pengaturan_tahfiz.html", row=row, nav="pengtahfiz")
+    sekolah = query(
+        "SELECT tempat_rapor, kabupaten, tanggal_rapor, kepala_sekolah, nip_kepala FROM sekolah ORDER BY id LIMIT 1",
+        one=True,
+    ) or {}
+    tanggal = _teks_tanggal(sekolah.get("tanggal_rapor"))
+    tampil = {
+        "tanggal_hijriah": row.get("tanggal_hijriah") or "",
+        "tanggal_masehi": row.get("tanggal_masehi") or (f"{tanggal} M" if tanggal else ""),
+        "tempat_cetak": row.get("tempat_cetak") or sekolah.get("tempat_rapor") or sekolah.get("kabupaten") or "",
+        "nama_kepala": row.get("nama_kepala") or sekolah.get("kepala_sekolah") or "",
+        "nbm_kepala": row.get("nbm_kepala") or sekolah.get("nip_kepala") or "",
+    }
+    return render_template("pengaturan_tahfiz.html", row=tampil, nav="pengtahfiz")
 
 
 @bp.route("/admin/tahfiz/nilai")
@@ -866,7 +2054,7 @@ def nilai_tahfiz():
         "nilai_tahfiz.html",
         siswa=siswa,
         kelas=kelas_opsi,
-        aspek=query("SELECT id,nama FROM aspek_tahfiz"),
+        aspek=query("SELECT id,nama FROM aspek_tahfiz WHERE aktif=1 ORDER BY urutan, id"),
         kelas_id=kelas_id,
         aspek_id=aspek_id,
         nav="nilaitahfiz",

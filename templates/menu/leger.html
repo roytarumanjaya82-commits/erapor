@@ -1,36 +1,162 @@
 {% extends "base.html" %}
 {% block title %}Leger Nilai{% endblock %}
+{% block content_class %}content-wide{% endblock %}
 {% block content %}
-<h1 class="page-title">Leger Nilai per Kelas</h1>
-<form method="get" class="toolbar">
-  <select name="kelas_id" class="search" onchange="this.form.submit()">
-    <option value="">Pilih kelas</option>
-    {% for k in kelas %}<option value="{{ k.id }}" {% if kelas_id==k.id|string %}selected{% endif %}>{{ k.nama }}</option>{% endfor %}
-  </select>
-</form>
-{% if info %}
-<div class="stats">
-  <div class="stat"><div><div class="lbl">KELAS</div><div class="val">{{ info.nama }}</div></div></div>
-  <div class="stat"><div><div class="lbl">WALI KELAS</div><div class="val" style="font-size:16px">{{ info.wali or '-' }}</div></div></div>
-  <div class="stat"><div><div class="lbl">SISWA</div><div class="val">{{ info.siswa }}</div></div></div>
-  <div class="stat"><div><div class="lbl">MAPEL</div><div class="val">{{ mapel|length }}</div></div></div>
+<div class="page-head">
+  <h1 class="page-title">Leger Nilai per Kelas</h1>
+  <div class="seg">
+    {% if kelas_id %}
+    <a class="btn btn-green" href="{{ url_for('menu.leger_unduh', kelas_id=kelas_id) }}">Unduh Leger Kelas</a>
+    {% endif %}
+    <a class="btn btn-amber" href="{{ url_for('menu.leger_unduh_semua') }}">Unduh Semua Kelas (ZIP)</a>
+  </div>
 </div>
-{% endif %}
-<div class="card" style="padding:8px 16px 16px;overflow:auto">
+
+<div class="leger-bar">
+  <div class="seg">
+    <a class="{% if tampil=='pratinjau' %}on{% endif %}" href="{{ url_for('menu.leger', tampil='pratinjau', kelas_id=kelas_id, mode=mode) }}">Pratinjau Leger Nilai</a>
+    <a class="{% if tampil=='daftar' %}on{% endif %}" href="{{ url_for('menu.leger', tampil='daftar', kelas_id=kelas_id) }}">Daftar Unduh Semua Kelas ({{ kelas|length }} Kelas)</a>
+  </div>
+  {% if tampil=='pratinjau' %}
+  <form method="get">
+    <input type="hidden" name="tampil" value="pratinjau">
+    <input type="hidden" name="mode" value="{{ mode }}">
+    <label for="kelas_id">Pilih Kelas</label>
+    <select id="kelas_id" name="kelas_id" class="search" onchange="this.form.submit()">
+      {% for k in kelas %}<option value="{{ k.id }}" {% if kelas_id==k.id|string %}selected{% endif %}>{{ k.nama }}</option>{% endfor %}
+    </select>
+  </form>
+  {% endif %}
+</div>
+
+{% if tampil=='daftar' %}
+<div class="card leger-scroll">
   <table class="data">
-    <thead>
-      <tr><th>No</th><th>NISN</th><th>Nama</th><th>L/P</th>{% for m in mapel %}<th>{{ m.nama }}</th>{% endfor %}</tr>
-    </thead>
+    <thead><tr><th>Kelas</th><th>Tingkat</th><th>Wali Kelas</th><th>Siswa</th><th>Mapel</th><th></th></tr></thead>
     <tbody>
-    {% for s in siswa %}
+    {% for k in daftar %}
       <tr>
-        <td>{{ loop.index }}</td><td>{{ s.nisn or s.nis }}</td><td>{{ s.nama }}</td><td>{{ s.jenis_kelamin }}</td>
-        {% for n in s.nilai %}<td>{{ n if n is not none else '-' }}</td>{% endfor %}
+        <td>{{ k.nama }}</td>
+        <td>{{ k.tingkat }}</td>
+        <td>{{ k.wali or '-' }}</td>
+        <td>{{ k.siswa }}</td>
+        <td>{{ k.mapel }}</td>
+        <td><a class="btn btn-green btn-sm" href="{{ url_for('menu.leger_unduh', kelas_id=k.id) }}">Unduh</a></td>
       </tr>
     {% else %}
-      <tr><td colspan="4">Pilih kelas untuk menampilkan leger.</td></tr>
+      <tr><td colspan="6">Belum ada kelas pada tugas Anda.</td></tr>
     {% endfor %}
     </tbody>
   </table>
 </div>
+{% elif paket %}
+<div class="leger-stats">
+  <div class="stat">
+    <div>
+      <div class="lbl">KELAS</div>
+      <div class="val" style="font-size:22px">{{ paket.info.nama }} <span class="tingkat">Tingkat {{ paket.info.tingkat }}</span></div>
+    </div>
+  </div>
+  <div class="stat">
+    <div>
+      <div class="lbl">WALI KELAS</div>
+      <div class="val" style="font-size:18px">{{ paket.info.wali or '-' }}</div>
+    </div>
+  </div>
+  <div class="stat">
+    <div>
+      <div class="lbl">TOTAL SISWA</div>
+      <div class="val">{{ paket.info.siswa }} <span style="font-size:14px;color:#94a3b8">Siswa</span></div>
+    </div>
+  </div>
+  <div class="stat">
+    <div>
+      <div class="lbl">TOTAL MAPEL</div>
+      <div class="val">{{ paket.info.mapel }} <span style="font-size:14px;color:#94a3b8">Mapel</span></div>
+    </div>
+  </div>
+</div>
+<div class="stat leger-rata">
+  <div>
+    <div class="lbl">RATA-RATA KELAS</div>
+    <div class="val">{{ paket.info.rata if paket.info.rata is not none else '-' }}</div>
+  </div>
+</div>
+
+<div class="leger-bar">
+  <div class="seg">
+    <a class="{% if mode=='ringkas' %}on-green{% endif %}" href="{{ url_for('menu.leger', kelas_id=kelas_id, mode='ringkas') }}">1. Nilai Rapor (Ringkas)</a>
+    <a class="{% if mode=='lengkap' %}on{% endif %}" href="{{ url_for('menu.leger', kelas_id=kelas_id, mode='lengkap') }}">2. Rincian Lengkap (Formatif, Sumatif, NA)</a>
+  </div>
+  <div class="seg">
+    <input id="cari-leger" class="search" placeholder="Cari siswa atau NISN...">
+    <a class="btn btn-green" href="{{ url_for('menu.leger_unduh', kelas_id=kelas_id, mode='ringkas') }}">Unduh Rapor (.xlsx)</a>
+    <a class="btn btn-indigo" href="{{ url_for('menu.leger_unduh', kelas_id=kelas_id, mode='lengkap') }}">Unduh Lengkap (.xlsx)</a>
+  </div>
+</div>
+
+<div class="card leger-scroll">
+  <table class="data leger">
+    <thead>
+      {% if mode=='lengkap' %}
+      <tr>
+        <th rowspan="2">No</th><th rowspan="2">NISN</th><th rowspan="2">Nama Siswa</th><th rowspan="2">L/P</th>
+        {% for m in paket.mapel %}<th colspan="3">{{ m.nama }}</th>{% endfor %}
+        <th rowspan="2">Jumlah</th><th rowspan="2">Rata-rata</th><th rowspan="2">Peringkat</th>
+      </tr>
+      <tr>
+        {% for m in paket.mapel %}<th>Formatif</th><th>Sumatif</th><th>NA</th>{% endfor %}
+      </tr>
+      {% else %}
+      <tr>
+        <th>No</th><th>NISN</th><th>Nama Siswa</th><th>L/P</th>
+        {% for m in paket.mapel %}<th>{{ m.nama }}</th>{% endfor %}
+        <th>Jumlah</th><th>Rata-rata</th><th>Peringkat</th>
+        <th>S</th><th>I</th><th>A</th>
+      </tr>
+      {% endif %}
+    </thead>
+    <tbody>
+    {% for s in paket.siswa %}
+      <tr data-cari="{{ s.nama }} {{ s.nisn or '' }} {{ s.nis }}">
+        <td>{{ loop.index }}</td>
+        <td>{{ s.nisn or s.nis }}</td>
+        <td class="nama">{{ s.nama }}</td>
+        <td><span class="pill-lp">{{ s.jenis_kelamin or '-' }}</span></td>
+        {% if mode=='lengkap' %}
+          {% for n in s.rinci %}
+            <td class="num">{{ n.formatif or '–' }}</td>
+            <td class="num">{{ n.sumatif or '–' }}</td>
+            <td class="num {{ 'bad' if n.na and n.rendah else ('ok' if n.na else '') }}">{{ n.na or '–' }}</td>
+          {% endfor %}
+        {% else %}
+          {% for n in s.nilai %}
+            <td class="num {{ 'bad' if n.teks and n.rendah else ('ok' if n.teks else '') }}">{{ n.teks or '–' }}</td>
+          {% endfor %}
+        {% endif %}
+        <td class="num">{{ s.jumlah if s.jumlah is not none else '–' }}</td>
+        <td class="num">{{ s.rata if s.rata is not none else '–' }}</td>
+        <td class="num">{{ '#' ~ s.peringkat if s.peringkat else '–' }}</td>
+        {% if mode!='lengkap' %}<td class="num">–</td><td class="num">–</td><td class="num">–</td>{% endif %}
+      </tr>
+    {% else %}
+      <tr><td colspan="8">Belum ada siswa di kelas ini.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="card"><p>Belum ada kelas pada tugas Anda.</p></div>
+{% endif %}
+<script>
+  const cari = document.getElementById('cari-leger');
+  if (cari) {
+    cari.addEventListener('input', () => {
+      const kata = cari.value.toLowerCase();
+      document.querySelectorAll('table.leger tbody tr').forEach(baris => {
+        baris.hidden = kata && !(baris.dataset.cari || '').toLowerCase().includes(kata);
+      });
+    });
+  }
+</script>
 {% endblock %}

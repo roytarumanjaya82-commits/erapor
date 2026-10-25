@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% block title %}{% if row.id %}Ubah Sekolah{% else %}Buat Sekolah{% endif %}{% endblock %}
+{% block content_class %}content-wide{% endblock %}
+{% block content %}
+<div class="crumb">Data Sekolah <span>›</span> {% if row.id %}Ubah{% else %}Buat{% endif %}</div>
+<div class="page-head">
+  <h1 class="page-title">{% if row.id %}Ubah Sekolah{% else %}Buat Sekolah{% endif %}</h1>
+  {% if row.id %}
+  <button class="btn btn-solid-danger" type="button" onclick="document.getElementById('hapus-sekolah').classList.add('open')">Hapus</button>
+  {% endif %}
+</div>
+<form method="post">
+  <div class="school-grid">
+    <div class="card">
+      <h3 class="section-title">Identitas Sekolah</h3>
+      <p class="sub">Kelola data profil sekolah resmi.</p>
+      <div class="form-grid">
+        <div>
+          <label>Nama Sekolah<span class="wajib">*</span></label>
+          <input type="text" name="nama" value="{{ row.nama or '' }}" required>
+        </div>
+        <div>
+          <label>NPSN<span class="wajib">*</span></label>
+          <input type="text" name="npsn" value="{{ row.npsn or '' }}" required>
+        </div>
+        <div>
+          <label>Status Sekolah</label>
+          <input type="text" name="status_sekolah" value="{{ row.status_sekolah or '' }}">
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <h3 class="section-title">Alamat Lengkap Sekolah</h3>
+      <p class="sub">Alamat ini akan otomatis dicetak pada KOP Laporan Hasil Belajar (Rapor).</p>
+      <div class="form-grid">
+        <div class="full">
+          <label>Alamat Jalan</label>
+          <input type="text" name="alamat" value="{{ row.alamat or '' }}">
+        </div>
+        <div>
+          <label>Desa / Kelurahan</label>
+          <input type="text" name="kelurahan" value="{{ row.kelurahan or '' }}">
+        </div>
+        <div>
+          <label>Kecamatan</label>
+          <input type="text" name="kecamatan" value="{{ row.kecamatan or '' }}">
+        </div>
+        <div>
+          <label>Kabupaten / Kota</label>
+          <input type="text" name="kabupaten" value="{{ row.kabupaten or '' }}">
+        </div>
+        <div>
+          <label>Provinsi</label>
+          <input type="text" name="provinsi" value="{{ row.provinsi or '' }}">
+        </div>
+        <div>
+          <label>Kode Pos</label>
+          <input type="text" name="kode_pos" value="{{ row.kode_pos or '' }}">
+        </div>
+        <div>
+          <label>No Telepon</label>
+          <input type="text" name="telepon" value="{{ row.telepon or '' }}">
+        </div>
+        <div class="full">
+          <label>Email</label>
+          <input type="email" name="email" value="{{ row.email or '' }}">
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    <h3 class="section-title">Pengesahan & Tanggal Cetak Rapor</h3>
+    <p class="sub">Atur Tempat & Tanggal Rapor (format Indonesia) serta Nama dan NBM/NIP Kepala Sekolah.</p>
+    <div class="form-grid">
+      <div>
+        <label>Tempat / Kota Penerbitan Rapor</label>
+        <input type="text" name="tempat_rapor" value="{{ row.tempat_rapor or '' }}">
+      </div>
+      <div>
+        <label>Tanggal Pembagian / Cetak Rapor<span class="wajib">*</span></label>
+        <input type="date" name="tanggal_rapor" value="{{ row.tanggal_rapor|iso }}" required>
+      </div>
+      <div>
+        <label>Nama Kepala Sekolah (Lengkap dengan Gelar)</label>
+        <input type="text" name="kepala_sekolah" value="{{ row.kepala_sekolah or '' }}">
+      </div>
+      <div>
+        <label>NBM / NIP Kepala Sekolah</label>
+        <input type="text" name="nip_kepala" value="{{ row.nip_kepala or '' }}">
+      </div>
+    </div>
+  </div>
+  <div class="form-actions">
+    <button class="btn btn-amber" type="submit">Simpan</button>
+    <a class="btn btn-ghost" href="{{ url_for('main.data_sekolah') }}">Batal</a>
+  </div>
+</form>
+{% if row.id %}
+<div class="modal-back" id="hapus-sekolah" onclick="if (event.target === this) this.classList.remove('open')">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="judul-hapus">
+    <button class="modal-x" type="button" onclick="document.getElementById('hapus-sekolah').classList.remove('open')" aria-label="Tutup">×</button>
+    <div class="modal-icon" aria-hidden="true">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M4 7h16M9 7V5h6v2M8 7l1 13h6l1-13"/>
+      </svg>
+    </div>
+    <h3 id="judul-hapus">Hapus Sekolah</h3>
+    <p>Apakah Anda yakin ingin melakukan ini?</p>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" type="button" onclick="document.getElementById('hapus-sekolah').classList.remove('open')">Batal</button>
+      <form method="post" action="{{ url_for('main.hapus_sekolah', item_id=row.id) }}">
+        <button class="btn btn-solid-danger" type="submit">Hapus</button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

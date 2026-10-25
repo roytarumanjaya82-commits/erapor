@@ -1,28 +1,146 @@
 {% extends "base.html" %}
-{% block title %}Predikat Sikap{% endblock %}
+{% block title %}Opsi Predikat Nilai Sikap{% endblock %}
+{% block content_class %}content-wide{% endblock %}
 {% block content %}
-<h1 class="page-title">Opsi Predikat Nilai Sikap</h1>
-{% if 'admin' in tugas %}
-<div class="card">
-  <form method="post" class="form-grid">
-    <div><label>Nama</label><input name="nama" required></div>
-    <div><label>Urutan</label><input type="number" name="urutan" value="0"></div>
-    <div class="full"><label>Format deskripsi</label><input name="deskripsi"></div>
-    <div><button class="btn btn-primary">Tambah</button></div>
-  </form>
+{% set admin = 'admin' in tugas %}
+<div class="crumb">Opsi Predikat Nilai Sikap <span>›</span> Daftar</div>
+<div class="page-head">
+  <h1 class="page-title">Opsi Predikat Nilai Sikap</h1>
+  {% if admin %}<button class="btn btn-amber" type="button" onclick="bukaBaru()">Tambah Predikat Sikap</button>{% endif %}
 </div>
-{% endif %}
-<div class="card" style="padding:8px 16px 16px">
+<div class="card" style="padding:8px 16px 16px;overflow:auto">
+  <div class="toolbar">
+    <span></span>
+    <form method="get">
+      <input type="hidden" name="arah" value="{{ arah }}">
+      <input type="hidden" name="per" value="{{ per }}">
+      <input class="search" name="q" value="{{ q }}" placeholder="Cari">
+    </form>
+  </div>
   <table class="data">
-    <thead><tr><th>Urutan</th><th>Predikat</th><th>Deskripsi</th><th></th></tr></thead>
+    <thead>
+      <tr>
+        <th><a class="sort" href="{{ url_for('menu.predikat', q=q, per=per, arah='desc' if arah=='asc' else 'asc') }}">Urutan</a></th>
+        <th>Nama Predikat</th>
+        <th>Format Deskripsi Rapor</th>
+        <th>Aktif</th>
+        {% if admin %}<th></th>{% endif %}
+      </tr>
+    </thead>
     <tbody>
     {% for r in rows %}
+      {% set kunci = (r.nama or '')|lower %}
       <tr>
-        <td>{{ r.urutan }}</td><td>{{ r.nama }}</td><td>{{ r.deskripsi }}</td>
-        <td>{% if 'admin' in tugas %}<form method="post" action="{{ url_for('menu.hapus_predikat', item_id=r.id) }}"><button class="btn btn-danger btn-sm">Hapus</button></form>{% endif %}</td>
+        <td>{{ r.urutan }}</td>
+        <td><span class="predikat-badge {% if kunci == 'berkembang' %}pred-amber{% elif kunci == 'cakap' %}pred-biru{% elif kunci == 'mahir' %}pred-hijau{% elif r.urutan % 3 == 2 %}pred-biru{% elif r.urutan % 3 == 0 %}pred-hijau{% else %}pred-amber{% endif %}">{{ r.nama }}</span></td>
+        <td>{{ r.deskripsi or '-' }}</td>
+        <td>
+          {% if admin %}
+          <form method="post" action="{{ url_for('menu.toggle_predikat', item_id=r.id) }}">
+            <input type="hidden" name="q" value="{{ q }}">
+            <input type="hidden" name="arah" value="{{ arah }}">
+            <input type="hidden" name="per" value="{{ per }}">
+            <input type="hidden" name="halaman" value="{{ halaman }}">
+            <input class="saklar" type="checkbox" name="nyala" value="1" {% if r.aktif %}checked{% endif %} onchange="this.form.submit()" aria-label="Aktif">
+          </form>
+          {% else %}
+          <input class="saklar" type="checkbox" {% if r.aktif %}checked{% endif %} disabled aria-label="Aktif">
+          {% endif %}
+        </td>
+        {% if admin %}
+        <td class="actions">
+          <button class="btn-ubah" type="button" onclick="bukaUbah({{ r.id }})">Ubah</button>
+          <form method="post" action="{{ url_for('menu.hapus_predikat', item_id=r.id) }}" onsubmit="return confirm('Hapus predikat sikap ini?')">
+            <button class="btn-hapus" type="submit">Hapus</button>
+          </form>
+        </td>
+        {% endif %}
       </tr>
+    {% else %}
+      <tr><td colspan="{{ 5 if admin else 4 }}" class="empty-state"><div class="empty-x">×</div>Tidak ada data yang ditemukan</td></tr>
     {% endfor %}
     </tbody>
   </table>
+  {% if total %}
+  <div class="pager">
+    <span>Menampilkan {{ awal }} sampai {{ akhir }} dari {{ total }} hasil</span>
+    <form method="get" class="pager-form">
+      <input type="hidden" name="q" value="{{ q }}">
+      <input type="hidden" name="arah" value="{{ arah }}">
+      {% if halaman > 1 %}<a href="{{ url_for('menu.predikat', q=q, arah=arah, per=per, halaman=halaman-1) }}">Sebelumnya</a>{% endif %}
+      {% if akhir < total %}<a href="{{ url_for('menu.predikat', q=q, arah=arah, per=per, halaman=halaman+1) }}">Berikutnya</a>{% endif %}
+      <label>per halaman</label>
+      <select name="per" onchange="this.form.submit()">
+        {% for n in [10, 25, 50, 100] %}<option value="{{ n }}" {% if per == n %}selected{% endif %}>{{ n }}</option>{% endfor %}
+      </select>
+    </form>
+  </div>
+  {% endif %}
 </div>
+{% if admin %}
+<div class="modal-back" id="modal-predikat" onclick="if (event.target === this) tutupModal()">
+  <div class="modal modal-lebar" role="dialog" aria-modal="true" aria-labelledby="judul-predikat">
+    <button class="modal-x" type="button" onclick="tutupModal()" aria-label="Tutup">×</button>
+    <h3 id="judul-predikat">Buat Predikat Sikap</h3>
+    <form method="post" action="{{ url_for('menu.simpan_predikat') }}" id="form-predikat">
+      <input type="hidden" name="id" id="predikat-id">
+      <input type="hidden" name="q" value="{{ q }}">
+      <div class="modal-grid">
+        <div>
+          <label>Nama Predikat<span class="wajib">*</span></label>
+          <input type="text" name="nama" id="predikat-nama" placeholder="Misal: Berkembang, Cakap, Mahir" required>
+          <p class="hint">Nama predikat yang akan muncul pada dropdown pilihan Wali Kelas.</p>
+          <label>Urutan Nilai</label>
+          <input type="number" name="urutan" id="predikat-urutan" value="1">
+          <p class="hint">Urutan tampilan nilai pada dropdown (1 = Terendah, 2 = Menengah, 3 = Tertinggi).</p>
+        </div>
+        <div>
+          <label>Awalan Deskripsi Rapor</label>
+          <input type="text" name="deskripsi" id="predikat-deskripsi" placeholder="Misal: Menunjukkan perkembangan pada dimensi">
+          <p class="hint">Kalimat deskripsi awalan ketika predikat ini dicetak pada rapor.</p>
+          <label class="tingkat-item" style="margin-top:8px">
+            <input class="saklar" type="checkbox" name="aktif" id="predikat-aktif" checked>
+            <span>Status Aktif (Tampil pada Pilihan Wali Kelas)</span>
+          </label>
+        </div>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-amber" id="tombol-simpan" name="aksi" value="simpan" type="submit">Buat</button>
+        <button class="btn btn-ghost" id="tombol-lagi" name="aksi" value="lagi" type="submit">Buat & buat lainnya</button>
+        <button class="btn btn-ghost" type="button" onclick="tutupModal()">Batal</button>
+      </div>
+    </form>
+  </div>
+</div>
+<script id="data-predikat" type="application/json">{{ rows|tojson }}</script>
+<script>
+var dataPredikat = JSON.parse(document.getElementById("data-predikat").textContent);
+function tutupModal() { document.getElementById("modal-predikat").classList.remove("open"); }
+function bukaBaru() {
+  document.getElementById("judul-predikat").textContent = "Buat Predikat Sikap";
+  document.getElementById("predikat-id").value = "";
+  document.getElementById("predikat-nama").value = "";
+  document.getElementById("predikat-deskripsi").value = "";
+  document.getElementById("predikat-urutan").value = "1";
+  document.getElementById("predikat-aktif").checked = true;
+  document.getElementById("tombol-simpan").textContent = "Buat";
+  document.getElementById("tombol-lagi").hidden = false;
+  document.getElementById("modal-predikat").classList.add("open");
+}
+function bukaUbah(id) {
+  var row = dataPredikat.filter(function (item) { return item.id === id; })[0];
+  if (!row) return;
+  document.getElementById("judul-predikat").textContent = "Ubah predikat sikap";
+  document.getElementById("predikat-id").value = row.id;
+  document.getElementById("predikat-nama").value = row.nama || "";
+  document.getElementById("predikat-deskripsi").value = row.deskripsi || "";
+  document.getElementById("predikat-urutan").value = row.urutan;
+  document.getElementById("predikat-aktif").checked = !!row.aktif;
+  document.getElementById("tombol-simpan").textContent = "Simpan";
+  document.getElementById("tombol-lagi").hidden = true;
+  document.getElementById("modal-predikat").classList.add("open");
+}
+{% if baru %}bukaBaru();{% endif %}
+</script>
+{% endif %}
 {% endblock %}

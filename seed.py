@@ -123,7 +123,7 @@ def main():
         ("admin", generate_password_hash("admin123"), "Administrator"),
     )
 
-    tingkat_list = [("X", 8), ("XI", 8), ("XII", 8)]
+    tingkat_list = [("7", 8), ("8", 8), ("9", 8)]
     kelas_ids = []
     n = 0
     for tingkat, jumlah in tingkat_list:
@@ -169,8 +169,8 @@ def main():
     kelompok = [
         ("A", "Kelompok A (Umum)", 1),
         ("B", "Kelompok B (Umum)", 2),
-        ("C", "Kelompok C (Peminatan)", 3),
-        ("M", "Muatan Lokal", 4),
+        ("C", "Kelompok C (Pilihan / Peminatan)", 3),
+        ("Muatan Lokal", "Muatan Lokal", 4),
     ]
     kel_ids = {}
     for kode, nama, ur in kelompok:
@@ -273,23 +273,26 @@ def main():
         cur.execute("INSERT INTO gabung_mapel_item (gabung_id, mapel_id) VALUES (%s,%s)", (gid, mid))
 
     cur.execute(
-        "INSERT INTO tryout (nama, tanggal, tingkat) VALUES (%s,%s,'XII')",
+        "INSERT INTO tryout (nama, tanggal, tingkat) VALUES (%s,%s,'9')",
         ("Tryout UTBK Gelombang 1", date(2026, 10, 12)),
     )
     cur.execute(
-        "INSERT INTO tryout (nama, tanggal, tingkat) VALUES (%s,%s,'XII')",
+        "INSERT INTO tryout (nama, tanggal, tingkat) VALUES (%s,%s,'9')",
         ("Tryout UTBK Gelombang 2", date(2026, 11, 16)),
     )
 
     aspek = [
-        ("Hafalan Juz 30", "Hafalan", 75),
-        ("Tajwid", "Tilawah", 75),
-        ("Kelancaran", "Tilawah", 75),
-        ("Adab Tilawah", "Sikap", 80),
+        ("Hafalan Juz 30", "Hafalan", 75, 1),
+        ("Tajwid", "Tilawah", 75, 2),
+        ("Kelancaran", "Tilawah", 75, 3),
+        ("Adab Tilawah", "Sikap", 80, 4),
     ]
     aspek_ids = []
-    for nama, jenis, kkm in aspek:
-        cur.execute("INSERT INTO aspek_tahfiz (nama,jenis,kkm) VALUES (%s,%s,%s)", (nama, jenis, kkm))
+    for nama, jenis, kkm, urutan in aspek:
+        cur.execute(
+            "INSERT INTO aspek_tahfiz (nama,jenis,kkm,urutan,aktif,dibuat) VALUES (%s,%s,%s,%s,1,NOW())",
+            (nama, jenis, kkm, urutan),
+        )
         aspek_ids.append(cur.lastrowid)
 
     tahfiz_guru = guru_ids[:8]

@@ -9,8 +9,8 @@
       <div>
         <label>Tingkat</label>
         <select name="tingkat">
-          {% for t in ['X','XI','XII'] %}
-          <option value="{{ t }}" {% if row.tingkat==t %}selected{% endif %}>{{ t }}</option>
+          {% for t in ['7','8','9'] %}
+          <option value="{{ t }}" {% if row.tingkat==t %}selected{% endif %}>Kelas {{ t }}</option>
           {% endfor %}
         </select>
       </div>

@@ -1,14 +1,85 @@
 {% extends "base.html" %}
 {% block title %}Kosongkan Data{% endblock %}
 {% block content %}
-<h1 class="page-title">Kosongkan Data</h1>
+<h1 class="page-title">Kosongkan Data System</h1>
+<div class="card warn-box">
+  <div class="warn-title">Perhatian Sebelum Mengosongkan Data</div>
+  <p>Tindakan pengosongan data bersifat <strong>permanen dan tidak dapat dibatalkan</strong>. Disarankan untuk melakukan <a href="{{ url_for('menu.backup') }}">Backup Database</a> terlebih dahulu. Akun Administrator Utama akan selalu terlindungi dari penghapusan.</p>
+</div>
 <div class="card">
-  <p>Pengosongan bersifat permanen. Unduh backup terlebih dahulu. Akun administrator tidak dihapus.</p>
-  <table class="data">
-    <tr><td>Nilai formatif, sumatif, tahfiz, dan ekskul</td><td>{{ jumlah.nilai }}</td>
-      <td><form method="post"> <input type="hidden" name="aksi" value="nilai"><input name="konfirmasi" placeholder="Ketik KOSONGKAN" required><button class="btn btn-danger">Kosongkan nilai</button></form></td></tr>
-    <tr><td>Siswa {{ jumlah.siswa }}, guru {{ jumlah.guru }}, kelas {{ jumlah.kelas }}</td><td></td>
-      <td><form method="post"><input type="hidden" name="aksi" value="reset"><input name="konfirmasi" placeholder="Ketik RESET" required><button class="btn btn-danger">Reset data aplikasi</button></form></td></tr>
+  <div class="warn-title">Daftar Kategori Data e-Rapor</div>
+  <p class="sub">Pilih kategori data yang ingin dikosongkan secara spesifik</p>
+  <table class="data kosong-table">
+    <thead>
+      <tr><th>Kategori Data</th><th>Keterangan & Tabel Terpengaruh</th><th>Jumlah Data</th><th>Aksi Pengosongan</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>1. Data Nilai</strong><div class="sub">Nilai Rapor, TP & Tryout</div></td>
+        <td>
+          Menghapus seluruh Nilai Formatif/Sumatif, Nilai Tahfiz, Nilai Ekskul, serta Perencanaan Penilaian.
+          <div class="chip-row"><span>nilai_formatif</span><span>nilai_sumatif</span><span>nilai_tahfiz</span><span>nilai_ekskul</span><span>perencanaan_penilaian</span></div>
+        </td>
+        <td><span class="count count-red">{{ jumlah.nilai }} Rekod</span></td>
+        <td>
+          <form method="post" onsubmit="return confirm('Kosongkan seluruh data nilai? Tindakan ini tidak dapat dibatalkan.')">
+            <input type="hidden" name="aksi" value="nilai">
+            <button class="btn btn-solid-danger" type="submit">Kosongkan Nilai</button>
+          </form>
+        </td>
+      </tr>
+      <tr>
+        <td><strong>2. Data Siswa</strong><div class="sub">Master Siswa & Absensi</div></td>
+        <td>
+          Menghapus data peserta didik, pendaftaran ekskul siswa, dan rekord nilai siswa.
+          <div class="chip-row"><span>siswa</span><span>nilai_ekskul</span><span>nilai_formatif</span><span>nilai_sumatif</span></div>
+        </td>
+        <td><span class="count count-blue">{{ jumlah.siswa }} Siswa</span></td>
+        <td>
+          <form method="post" onsubmit="return confirm('Kosongkan seluruh data siswa beserta nilainya? Tindakan ini tidak dapat dibatalkan.')">
+            <input type="hidden" name="aksi" value="siswa">
+            <button class="btn btn-solid-danger" type="submit">Kosongkan Siswa</button>
+          </form>
+        </td>
+      </tr>
+      <tr>
+        <td><strong>3. Data Guru & Akun</strong><div class="sub">Master Guru & User Login</div></td>
+        <td>
+          Menghapus data guru, pemetaan jam mengajar, serta akun login guru dan siswa. Akun administrator tetap ada.
+          <div class="chip-row"><span>guru</span><span>pelajaran</span><span>users (non-admin)</span></div>
+        </td>
+        <td><span class="count count-green">{{ jumlah.guru }} Guru</span></td>
+        <td>
+          <form method="post" onsubmit="return confirm('Kosongkan data guru dan akun selain administrator? Tindakan ini tidak dapat dibatalkan.')">
+            <input type="hidden" name="aksi" value="guru">
+            <button class="btn btn-solid-danger" type="submit">Kosongkan Guru</button>
+          </form>
+        </td>
+      </tr>
+      <tr>
+        <td><strong>4. Data Rombel & Ekskul</strong><div class="sub">Kelas Reguler & Ekskul</div></td>
+        <td>
+          Menghapus rombongan belajar, ekstrakurikuler, dan pemetaan pembelajaran rombel.
+          <div class="chip-row"><span>kelas</span><span>ekstrakurikuler</span><span>pelajaran</span></div>
+        </td>
+        <td><span class="count count-amber">{{ jumlah.rombel }} Rombel</span></td>
+        <td>
+          <form method="post" onsubmit="return confirm('Kosongkan rombel, ekskul, dan pembelajaran? Tindakan ini tidak dapat dibatalkan.')">
+            <input type="hidden" name="aksi" value="rombel">
+            <button class="btn btn-solid-danger" type="submit">Kosongkan Rombel</button>
+          </form>
+        </td>
+      </tr>
+    </tbody>
   </table>
+</div>
+<div class="card danger-zone">
+  <div class="warn-title">RESET TOTAL DATABASE e-RAPOR</div>
+  <p class="sub">Tindakan Sangat Berbahaya (Danger Zone)</p>
+  <p>Mengosongkan seluruh data aplikasi e-Rapor (Nilai, Siswa, Guru, Rombel, Mapel, Ekskul, Akun Guru/Siswa). Aplikasi kembali ke kondisi bersih seperti awal instalasi. <strong>Akun Administrator Utama tetap aman.</strong></p>
+  <form method="post" onsubmit="return confirm('RESET TOTAL menghapus nilai, siswa, guru, rombel, mapel, dan ekskul. Akun administrator tetap ada. Lanjutkan?')">
+    <input type="hidden" name="aksi" value="reset">
+    <button class="btn btn-solid-danger" type="submit">RESET TOTAL DATABASE</button>
+  </form>
 </div>
 {% endblock %}

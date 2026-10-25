@@ -3,13 +3,18 @@
 {% block content %}
 <h1 class="page-title">Pengaturan Rapor Tahfiz</h1>
 <div class="card">
-  <form method="post">
-    <div class="form-grid">
-      <div class="full"><label>Judul</label><input type="text" name="judul" value="{{ row.judul or 'Rapor Tahfiz' }}"></div>
-      <div class="full"><label>Keterangan</label><textarea name="keterangan">{{ row.keterangan or '' }}</textarea></div>
-      <div class="full"><label class="check"><input type="checkbox" name="tampilkan" {% if row.tampilkan != 0 %}checked{% endif %}> Tampilkan pada rapor</label></div>
-    </div>
-    <div class="form-actions"><button class="btn btn-primary">Simpan</button></div>
+  <form method="post" class="form-stack">
+    <label>Tanggal Hijriah Rapor<span class="wajib">*</span></label>
+    <input type="text" name="tanggal_hijriah" value="{{ row.tanggal_hijriah or '' }}" placeholder="Contoh: 5 Jumadil Awal 1448 H" required>
+    <label>Tanggal Masehi Rapor<span class="wajib">*</span></label>
+    <input type="text" name="tanggal_masehi" value="{{ row.tanggal_masehi or '' }}" placeholder="Contoh: 16 Oktober 2026 M" required>
+    <label>Tempat Cetak Rapor<span class="wajib">*</span></label>
+    <input type="text" name="tempat_cetak" value="{{ row.tempat_cetak or '' }}" required>
+    <label>Nama Kepala Sekolah (Lengkap dengan Gelar)<span class="wajib">*</span></label>
+    <input type="text" name="nama_kepala" value="{{ row.nama_kepala or '' }}" required>
+    <label>NBM Kepala Sekolah<span class="wajib">*</span></label>
+    <input type="text" name="nbm_kepala" value="{{ row.nbm_kepala or '' }}" required>
+    <div class="form-actions"><button class="btn btn-amber" type="submit">Simpan Pengaturan</button></div>
   </form>
 </div>
 {% endblock %}

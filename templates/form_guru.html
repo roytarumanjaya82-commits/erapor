@@ -1,38 +1,60 @@
 {% extends "base.html" %}
-{% block title %}Form Guru{% endblock %}
+{% block title %}{% if row.id %}Ubah Guru{% else %}Buat Guru{% endif %}{% endblock %}
 {% block content %}
-<h1 class="page-title">{% if row.id %}Ubah Guru{% else %}Tambah Guru{% endif %}</h1>
-<div class="card">
-  <form method="post">
+<div class="crumb">Data Guru <span>›</span> {% if row.id %}Ubah{% else %}Buat{% endif %}</div>
+<div class="page-head">
+  <h1 class="page-title">{% if row.id %}Ubah Guru{% else %}Buat Guru{% endif %}</h1>
+</div>
+<form method="post">
+  <div class="card">
+    <h3 class="section-title">Identitas guru</h3>
     <div class="form-grid">
-      <div><label>Nama</label><input type="text" name="nama" value="{{ row.nama or '' }}" required></div>
-      <div><label>Gelar depan</label><input type="text" name="gelar_depan" value="{{ row.gelar_depan or '' }}"></div>
-      <div><label>Gelar belakang</label><input type="text" name="gelar_belakang" value="{{ row.gelar_belakang or '' }}"></div>
-      <div><label>NIP</label><input type="text" name="nip" value="{{ row.nip or '' }}"></div>
-      <div><label>NUPTK</label><input type="text" name="nuptk" value="{{ row.nuptk or '' }}"></div>
+      <div class="full"><label>Nama</label><input type="text" name="nama" value="{{ row.nama or '' }}" required></div>
+      <div><label>Gelar depan</label><input type="text" name="gelar_depan" value="{{ row.gelar_depan or '' }}" placeholder="Drs., Dr."></div>
+      <div><label>Gelar belakang</label><input type="text" name="gelar_belakang" value="{{ row.gelar_belakang or '' }}" placeholder="S.Pd., M.Pd."></div>
       <div>
         <label>Jenis kelamin</label>
         <select name="jenis_kelamin">
+          <option value="" {% if not row.jenis_kelamin %}selected{% endif %}>Belum diisi</option>
           <option value="L" {% if row.jenis_kelamin=='L' %}selected{% endif %}>Laki-laki</option>
           <option value="P" {% if row.jenis_kelamin=='P' %}selected{% endif %}>Perempuan</option>
         </select>
       </div>
+      <div><label>NUPTK</label><input type="text" name="nuptk" value="{{ row.nuptk or '' }}"></div>
+      <div><label>NBM</label><input type="text" name="nbm" value="{{ row.nbm or '' }}"></div>
+      <div><label>NIP</label><input type="text" name="nip" value="{{ row.nip or '' }}"></div>
+    </div>
+  </div>
+  <div class="card">
+    <h3 class="section-title">Tugas mengajar</h3>
+    <div class="form-grid">
+      <div class="full"><label>Mata pelajaran</label><input type="text" name="mapel_ajar" value="{{ row.mapel_ajar or '' }}"></div>
+      <div><label>Jumlah jam</label><input type="number" name="jumlah_jam" min="0" value="{{ row.jumlah_jam if row.jumlah_jam is not none else '' }}"></div>
+      <div><label>Mengajar di kelas</label><input type="text" name="mengajar_di" value="{{ row.mengajar_di or '' }}"></div>
+      <div>
+        <label>Status aktif</label>
+        <select name="aktif">
+          <option value="1" {% if row.aktif!=0 %}selected{% endif %}>Aktif</option>
+          <option value="0" {% if row.aktif==0 %}selected{% endif %}>Tidak aktif</option>
+        </select>
+      </div>
+      <div><label>Status kepegawaian</label><input type="text" name="status_kepegawaian" value="{{ row.status_kepegawaian or 'Guru Tetap' }}"></div>
+    </div>
+  </div>
+  <div class="card">
+    <h3 class="section-title">Data tambahan</h3>
+    <div class="form-grid">
       <div><label>Tempat lahir</label><input type="text" name="tempat_lahir" value="{{ row.tempat_lahir or '' }}"></div>
       <div><label>Tanggal lahir</label><input type="date" name="tanggal_lahir" value="{{ row.tanggal_lahir|iso }}"></div>
       <div><label>Agama</label><input type="text" name="agama" value="{{ row.agama or 'Islam' }}"></div>
       <div><label>No. HP</label><input type="text" name="no_hp" value="{{ row.no_hp or '' }}"></div>
       <div><label>Email</label><input type="email" name="email" value="{{ row.email or '' }}"></div>
-      <div><label>Status kepegawaian</label><input type="text" name="status_kepegawaian" value="{{ row.status_kepegawaian or 'Guru Tetap' }}"></div>
-      <div class="full"><label>Mata pelajaran</label><input type="text" name="mapel_ajar" value="{{ row.mapel_ajar or '' }}"></div>
-      <div><label>Jumlah jam</label><input type="number" name="jumlah_jam" value="{{ row.jumlah_jam if row.jumlah_jam is not none else '' }}"></div>
-      <div><label>Mengajar di kelas</label><input type="text" name="mengajar_di" value="{{ row.mengajar_di or '' }}"></div>
-      <div><label>Aktif</label><select name="aktif"><option value="1">Ya</option><option value="0" {% if row.aktif==0 %}selected{% endif %}>Tidak</option></select></div>
       <div class="full"><label>Alamat</label><textarea name="alamat">{{ row.alamat or '' }}</textarea></div>
     </div>
     <div class="form-actions">
-      <button class="btn btn-primary" type="submit">Simpan</button>
+      <button class="btn btn-amber" type="submit">Simpan</button>
       <a class="btn btn-ghost" href="{{ url_for('main.data_guru') }}">Batal</a>
     </div>
-  </form>
-</div>
+  </div>
+</form>
 {% endblock %}

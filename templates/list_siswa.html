@@ -1,36 +1,155 @@
 {% extends "base.html" %}
 {% block title %}Data Siswa{% endblock %}
+{% block content_class %}content-wide{% endblock %}
 {% block content %}
-<h1 class="page-title">Data Siswa</h1>
-<div class="toolbar">
-  <form method="get" style="display:flex;gap:8px;flex-wrap:wrap">
-    <input class="search" name="q" value="{{ q }}" placeholder="Cari nama / NIS / NISN">
-    <select name="kelas_id" class="search" onchange="this.form.submit()">
-      <option value="">Semua kelas</option>
-      {% for k in kelas %}
-      <option value="{{ k.id }}" {% if kelas_id|string==k.id|string %}selected{% endif %}>{{ k.nama }}</option>
+{% set admin = current_user and current_user.role == 'admin' %}
+<div class="crumb">Data Siswa <span>›</span> Daftar</div>
+<div class="page-head">
+  <h1 class="page-title">Data Siswa</h1>
+  {% if admin %}<a class="btn btn-amber" href="{{ url_for('main.form_siswa') }}">Buat peserta didik</a>{% endif %}
+</div>
+<div class="card" style="padding:8px 16px 16px;overflow:auto">
+  <div class="toolbar">
+    <span></span>
+    <div class="icon-tools">
+      <form method="get">
+        <input type="hidden" name="kelas_id" value="{{ kelas_id }}">
+        <input type="hidden" name="jk" value="{{ jk }}">
+        <input type="hidden" name="urut" value="{{ urut }}">
+        <input type="hidden" name="arah" value="{{ arah }}">
+        <input type="hidden" name="per" value="{{ per }}">
+        <input class="search" name="q" value="{{ q }}" placeholder="Cari">
+      </form>
+      <details class="tool-pop">
+        <summary class="icon-btn" aria-label="Filter">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5h16l-6 7v6l-4 2v-8z"/></svg>
+          {% if saring %}<span class="count-dot">{{ saring }}</span>{% endif %}
+        </summary>
+        <form class="pop" method="get">
+          <input type="hidden" name="q" value="{{ q }}">
+          <input type="hidden" name="urut" value="{{ urut }}">
+          <input type="hidden" name="arah" value="{{ arah }}">
+          <input type="hidden" name="per" value="{{ per }}">
+          <label>Kelas / Rombel</label>
+          <select name="kelas_id">
+            <option value="">Semua kelas</option>
+            {% for k in kelas %}
+            <option value="{{ k.id }}" {% if kelas_id|string == k.id|string %}selected{% endif %}>{{ k.nama }}</option>
+            {% endfor %}
+          </select>
+          <label>Jenis kelamin</label>
+          <select name="jk">
+            <option value="">Semua</option>
+            <option value="L" {% if jk=='L' %}selected{% endif %}>Laki-laki</option>
+            <option value="P" {% if jk=='P' %}selected{% endif %}>Perempuan</option>
+          </select>
+          <button class="btn btn-amber" type="submit">Terapkan</button>
+        </form>
+      </details>
+      <details class="tool-pop">
+        <summary class="icon-btn" aria-label="Kolom">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M10 4v16M4 10h16"/></svg>
+          <span class="count-dot" id="sembunyi">0</span>
+        </summary>
+        <div class="pop">
+          <label class="check"><input type="checkbox" data-kolom="nisn" checked> NISN</label>
+          <label class="check"><input type="checkbox" data-kolom="nis" checked> NIS</label>
+          <label class="check"><input type="checkbox" data-kolom="jk" checked> JK</label>
+          <label class="check"><input type="checkbox" data-kolom="kelas" checked> Kelas / Rombel</label>
+        </div>
+      </details>
+    </div>
+  </div>
+  <form method="post" action="{{ url_for('main.hapus_siswa_terpilih') }}" onsubmit="return confirm('Hapus peserta didik yang dipilih? Nilai mereka ikut terhapus.')">
+    {% if admin %}
+    <div class="bulk-bar" id="bulk-bar">
+      <span id="bulk-teks">0 dipilih</span>
+      <button class="btn btn-solid-danger btn-sm" type="submit">Hapus terpilih</button>
+    </div>
+    {% endif %}
+    <table class="data">
+      <thead>
+        <tr>
+          {% if admin %}<th><input type="checkbox" id="pilih-semua" aria-label="Pilih semua"></th>{% endif %}
+          <th><a class="sort" href="{{ url_for('main.data_siswa', q=q, kelas_id=kelas_id, jk=jk, per=per, urut='nama', arah='desc' if urut=='nama' and arah=='asc' else 'asc') }}">Nama Siswa</a></th>
+          <th data-col="nisn"><a class="sort" href="{{ url_for('main.data_siswa', q=q, kelas_id=kelas_id, jk=jk, per=per, urut='nisn', arah='desc' if urut=='nisn' and arah=='asc' else 'asc') }}">NISN</a></th>
+          <th data-col="nis"><a class="sort" href="{{ url_for('main.data_siswa', q=q, kelas_id=kelas_id, jk=jk, per=per, urut='nis', arah='desc' if urut=='nis' and arah=='asc' else 'asc') }}">NIS</a></th>
+          <th data-col="jk">JK</th>
+          <th data-col="kelas"><a class="sort" href="{{ url_for('main.data_siswa', q=q, kelas_id=kelas_id, jk=jk, per=per, urut='kelas', arah='desc' if urut=='kelas' and arah=='asc' else 'asc') }}">Kelas / Rombel</a></th>
+          {% if admin %}<th></th>{% endif %}
+        </tr>
+      </thead>
+      <tbody>
+      {% for r in rows %}
+        <tr>
+          {% if admin %}<td><input class="pilih-siswa" type="checkbox" name="id" value="{{ r.id }}"></td>{% endif %}
+          <td><strong>{{ r.nama }}</strong></td>
+          <td data-col="nisn">{{ r.nisn or '-' }}</td>
+          <td data-col="nis">{{ r.nis }}</td>
+          <td data-col="jk">
+            {% if r.jenis_kelamin=='L' %}<span class="jk laki">Laki-laki</span>
+            {% elif r.jenis_kelamin=='P' %}<span class="jk perempuan">Perempuan</span>
+            {% else %}-{% endif %}
+          </td>
+          <td data-col="kelas">{% if r.kelas_nama %}<span class="rombel">{{ r.kelas_nama }}</span>{% else %}-{% endif %}</td>
+          {% if admin %}
+          <td class="actions"><a class="btn-ubah" href="{{ url_for('main.form_siswa', item_id=r.id) }}">Edit</a></td>
+          {% endif %}
+        </tr>
+      {% else %}
+        <tr><td colspan="7">Belum ada peserta didik.</td></tr>
       {% endfor %}
-    </select>
-    <button class="btn btn-ghost">Cari</button>
+      </tbody>
+    </table>
   </form>
-  <a class="btn btn-primary" href="{{ url_for('main.form_siswa') }}">+ Tambah siswa</a>
+  <div class="pager">
+    <span>
+      {% if total == 0 %}Belum ada hasil
+      {% elif awal == 1 and akhir == total %}Menampilkan {{ total }} hasil
+      {% else %}Menampilkan {{ awal }} sampai {{ akhir }} dari {{ total }} hasil{% endif %}
+    </span>
+    <form method="get" class="pager-form">
+      <input type="hidden" name="q" value="{{ q }}">
+      <input type="hidden" name="kelas_id" value="{{ kelas_id }}">
+      <input type="hidden" name="jk" value="{{ jk }}">
+      <input type="hidden" name="urut" value="{{ urut }}">
+      <input type="hidden" name="arah" value="{{ arah }}">
+      {% if halaman > 1 %}<a href="{{ url_for('main.data_siswa', q=q, kelas_id=kelas_id, jk=jk, urut=urut, arah=arah, per=per, halaman=halaman-1) }}">Sebelumnya</a>{% endif %}
+      {% if akhir < total %}<a href="{{ url_for('main.data_siswa', q=q, kelas_id=kelas_id, jk=jk, urut=urut, arah=arah, per=per, halaman=halaman+1) }}">Berikutnya</a>{% endif %}
+      <label>per halaman</label>
+      <select name="per" onchange="this.form.submit()">
+        {% for n in [10, 25, 50, 100] %}<option value="{{ n }}" {% if per == n %}selected{% endif %}>{{ n }}</option>{% endfor %}
+      </select>
+    </form>
+  </div>
 </div>
-<div class="card" style="padding:8px 16px 16px">
-  <table class="data">
-    <thead><tr><th>NIS</th><th>Nama</th><th>JK</th><th>Kelas</th><th>Status</th><th></th></tr></thead>
-    <tbody>
-    {% for r in rows %}
-      <tr>
-        <td>{{ r.nis }}</td><td>{{ r.nama }}</td><td>{{ r.jenis_kelamin }}</td><td>{{ r.kelas_nama or '-' }}</td><td>{{ r.status }}</td>
-        <td class="actions">
-          <a class="btn btn-ghost btn-sm" href="{{ url_for('main.form_siswa', item_id=r.id) }}">Ubah</a>
-          <form method="post" action="{{ url_for('main.hapus_siswa', item_id=r.id) }}" onsubmit="return confirm('Hapus siswa?')">
-            <button class="btn btn-danger btn-sm">Hapus</button>
-          </form>
-        </td>
-      </tr>
-    {% endfor %}
-    </tbody>
-  </table>
-</div>
+<script>
+document.querySelectorAll("[data-kolom]").forEach(function (box) {
+  box.addEventListener("change", function () {
+    var tampil = box.checked ? "" : "none";
+    document.querySelectorAll('[data-col="' + box.value + '"]').forEach(function (sel) {
+      sel.style.display = tampil;
+    });
+    var sembunyi = document.querySelectorAll("[data-kolom]:not(:checked)").length;
+    document.getElementById("sembunyi").textContent = sembunyi;
+  });
+});
+var semua = document.getElementById("pilih-semua");
+function hitungPilih() {
+  var n = document.querySelectorAll(".pilih-siswa:checked").length;
+  var bar = document.getElementById("bulk-bar");
+  if (!bar) return;
+  bar.classList.toggle("on", n > 0);
+  document.getElementById("bulk-teks").textContent = n + " dipilih";
+}
+if (semua) {
+  semua.addEventListener("change", function () {
+    document.querySelectorAll(".pilih-siswa").forEach(function (kotak) { kotak.checked = semua.checked; });
+    hitungPilih();
+  });
+  document.querySelectorAll(".pilih-siswa").forEach(function (kotak) {
+    kotak.addEventListener("change", hitungPilih);
+  });
+}
+</script>
 {% endblock %}

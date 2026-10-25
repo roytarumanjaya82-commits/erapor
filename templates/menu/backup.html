@@ -1,18 +1,73 @@
 {% extends "base.html" %}
 {% block title %}Backup dan Restore{% endblock %}
 {% block content %}
-<h1 class="page-title">Backup & Restore</h1>
-<div class="card">
-  <h3>Unduh backup</h3>
-  <p>File SQL berisi data akademik sekolah. Simpan di tempat yang aman.</p>
-  <a class="btn btn-primary" href="{{ url_for('menu.backup_unduh') }}">Unduh backup</a>
+<h1 class="page-title">Backup & Restore Data Database</h1>
+
+<div class="card info-box">
+  <div class="warn-title">Sistem Backup & Restore Terenkripsi (AES-256-CBC)</div>
+  <p>Setiap file backup e-Rapor dikompresi dengan <strong>Gzip</strong>, dienkripsi secara kriptografis menggunakan <strong>AES-256-CBC</strong>, serta diverifikasi integritasnya melalui <strong>HMAC-SHA256</strong>. File tidak dapat dibaca, diubah, atau disisipi data tanpa kata kunci yang valid.</p>
 </div>
+
 <div class="card">
-  <h3>Pulihkan dari file</h3>
-  <p>Hanya file backup yang diunduh dari aplikasi ini yang dapat dipulihkan.</p>
-  <form method="post" action="{{ url_for('menu.restore') }}" enctype="multipart/form-data" onsubmit="return confirm('Data saat ini akan ditimpa isi backup. Lanjutkan?')">
-    <input type="file" name="berkas" accept=".sql" required>
-    <div class="form-actions"><button class="btn btn-primary">Jalankan restore</button></div>
+  <div class="warn-title">Buat Backup Database Baru</div>
+  <p class="sub">Ekspor & Enkripsi Data e-Rapor (.eraporbak)</p>
+  <form method="post" action="{{ url_for('menu.backup_buat') }}">
+    <label>Kata Kunci Enkripsi (Opsional)</label>
+    <input type="password" name="kunci" placeholder="Kosongkan jika menggunakan kata kunci sistem default" autocomplete="new-password">
+    <p class="hint">*Jika kata kunci diisi, Anda wajib memasukkannya saat hendak melakukan restore.</p>
+    <button class="btn btn-green" type="submit">Buat & Unduh Backup Terenkripsi</button>
   </form>
+</div>
+
+<div class="card">
+  <div class="warn-title">Restore Database dari File</div>
+  <p class="sub">Upload & Dekripsi File .eraporbak</p>
+  <form method="post" action="{{ url_for('menu.restore') }}" enctype="multipart/form-data" onsubmit="return confirm('Restore menimpa data saat ini dengan isi file backup. Lanjutkan?')">
+    <label>Upload File Backup (.eraporbak / .enc)</label>
+    <input type="file" name="berkas" accept=".eraporbak,.enc,.sql" required>
+    <p class="hint">Klik atau seret file .eraporbak ke sini. Maksimal 100MB.</p>
+    <label>Kata Kunci Dekripsi</label>
+    <input type="password" name="kunci" placeholder="Masukkan kata kunci enkripsi jika saat backup diisi" autocomplete="current-password">
+    <button class="btn btn-amber" type="submit">Jalankan Restore Database</button>
+  </form>
+</div>
+
+<div class="card">
+  <div class="warn-title">Daftar Backup di Server</div>
+  <p class="sub">Arsip tersimpan di storage/app/private/backups/</p>
+  <table class="data">
+    <thead>
+      <tr>
+        <th>Nama File Backup</th>
+        <th>Enkripsi</th>
+        <th>Ukuran File</th>
+        <th>Waktu Pembuatan</th>
+        <th>Aksi</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in berkas %}
+      <tr>
+        <td>{{ item.nama }}</td>
+        <td>AES-256</td>
+        <td>{{ item.ukuran }}</td>
+        <td>{{ item.waktu }}</td>
+        <td class="aksi">
+          <a href="{{ url_for('menu.backup_file', nama=item.nama) }}">Unduh</a>
+          <form method="post" action="{{ url_for('menu.backup_hapus', nama=item.nama) }}" onsubmit="return confirm('Hapus file backup ini dari server?')">
+            <button type="submit">Hapus</button>
+          </form>
+        </td>
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="5" class="empty-backup">
+          Belum ada file backup tersimpan di server.<br>
+          Klik tombol "Buat & Unduh Backup Terenkripsi" di atas untuk membuat backup pertama.
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
 </div>
 {% endblock %}

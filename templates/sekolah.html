@@ -1,26 +1,61 @@
 {% extends "base.html" %}
 {% block title %}Data Sekolah{% endblock %}
+{% block content_class %}content-wide{% endblock %}
 {% block content %}
-<h1 class="page-title">Data Sekolah</h1>
-<div class="card">
-  <form method="post">
-    <div class="form-grid">
-      <div><label>Nama sekolah</label><input type="text" name="nama" value="{{ sekolah.nama or '' }}" required></div>
-      <div><label>NPSN</label><input type="text" name="npsn" value="{{ sekolah.npsn or '' }}"></div>
-      <div><label>Jenjang</label><input type="text" name="jenjang" value="{{ sekolah.jenjang or 'SMA' }}"></div>
-      <div><label>Kode pos</label><input type="text" name="kode_pos" value="{{ sekolah.kode_pos or '' }}"></div>
-      <div class="full"><label>Alamat</label><textarea name="alamat">{{ sekolah.alamat or '' }}</textarea></div>
-      <div><label>Kelurahan</label><input type="text" name="kelurahan" value="{{ sekolah.kelurahan or '' }}"></div>
-      <div><label>Kecamatan</label><input type="text" name="kecamatan" value="{{ sekolah.kecamatan or '' }}"></div>
-      <div><label>Kabupaten/Kota</label><input type="text" name="kabupaten" value="{{ sekolah.kabupaten or '' }}"></div>
-      <div><label>Provinsi</label><input type="text" name="provinsi" value="{{ sekolah.provinsi or '' }}"></div>
-      <div><label>Telepon</label><input type="text" name="telepon" value="{{ sekolah.telepon or '' }}"></div>
-      <div><label>Email</label><input type="email" name="email" value="{{ sekolah.email or '' }}"></div>
-      <div><label>Website</label><input type="text" name="website" value="{{ sekolah.website or '' }}"></div>
-      <div><label>Kepala sekolah</label><input type="text" name="kepala_sekolah" value="{{ sekolah.kepala_sekolah or '' }}"></div>
-      <div><label>NIP kepala sekolah</label><input type="text" name="nip_kepala" value="{{ sekolah.nip_kepala or '' }}"></div>
-    </div>
-    <div class="form-actions"><button class="btn btn-primary" type="submit">Simpan</button></div>
-  </form>
+<div class="crumb">Data Sekolah <span>›</span> Daftar</div>
+<div class="page-head">
+  <h1 class="page-title">Data Sekolah</h1>
+  <a class="btn btn-amber" href="{{ url_for('main.form_sekolah') }}">Buat sekolah</a>
+</div>
+<div class="card" style="padding:8px 16px 16px;overflow:auto">
+  <div class="toolbar">
+    <span></span>
+    <form method="get">
+      <input type="hidden" name="per" value="{{ per }}">
+      <input class="search" name="q" value="{{ q }}" placeholder="Cari">
+    </form>
+  </div>
+  <table class="data">
+    <thead>
+      <tr>
+        <th>Nama Sekolah</th>
+        <th>NPSN</th>
+        <th>Alamat Jalan</th>
+        <th>Kabupaten / Kota</th>
+        <th>Kepala Sekolah</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for r in rows %}
+      <tr>
+        <td><strong>{{ r.nama }}</strong></td>
+        <td>{{ r.npsn or '-' }}</td>
+        <td>{{ r.alamat or '-' }}</td>
+        <td>{{ r.kabupaten or '-' }}</td>
+        <td>{{ r.kepala_sekolah or '-' }}</td>
+        <td class="actions"><a class="btn-ubah" href="{{ url_for('main.form_sekolah', item_id=r.id) }}">Ubah</a></td>
+      </tr>
+    {% else %}
+      <tr><td colspan="6">Belum ada data sekolah.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  <div class="pager">
+    <span>
+      {% if total == 0 %}Belum ada hasil
+      {% elif awal == 1 and akhir == total %}Menampilkan {{ total }} hasil
+      {% else %}Menampilkan {{ awal }} sampai {{ akhir }} dari {{ total }} hasil{% endif %}
+    </span>
+    <form method="get" class="pager-form">
+      <input type="hidden" name="q" value="{{ q }}">
+      {% if halaman > 1 %}<a href="{{ url_for('main.data_sekolah', q=q, per=per, halaman=halaman-1) }}">Sebelumnya</a>{% endif %}
+      {% if akhir < total %}<a href="{{ url_for('main.data_sekolah', q=q, per=per, halaman=halaman+1) }}">Berikutnya</a>{% endif %}
+      <label>per halaman</label>
+      <select name="per" onchange="this.form.submit()">
+        {% for n in [10, 25, 50, 100] %}<option value="{{ n }}" {% if per == n %}selected{% endif %}>{{ n }}</option>{% endfor %}
+      </select>
+    </form>
+  </div>
 </div>
 {% endblock %}

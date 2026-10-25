@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}Buat Mapping Rapor{% endblock %}
+{% block content_class %}content-wide{% endblock %}
+{% block content %}
+<div class="crumb">Data Mapping Rapor <span>›</span> Buat</div>
+<div class="page-head">
+  <h1 class="page-title">Buat Mapping Rapor</h1>
+</div>
+<form method="post">
+  <div class="form-grid">
+    <div>
+      <label>Kurikulum Sekolah<span class="wajib">*</span></label>
+      <select name="kurikulum" required>
+        <option value="">Pilih salah satu opsi</option>
+        {% for item in kurikulum_opsi %}
+        <option value="{{ item }}">{{ item }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label>Tingkat<span class="wajib">*</span></label>
+      <select name="tingkat" required>
+        <option value="">Pilih salah satu opsi</option>
+        {% for item in tingkat_opsi %}
+        <option value="{{ item }}">{{ item }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label>Mata Pelajaran<span class="wajib">*</span></label>
+      <select name="mapel_id" id="mapel-mapping" required>
+        <option value="">Pilih salah satu opsi</option>
+        {% for m in mapel %}
+        <option value="{{ m.id }}">{{ m.nama }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label>Nama Lokal<span class="wajib">*</span></label>
+      <input type="text" name="nama_lokal" id="nama-lokal" required>
+    </div>
+    <div>
+      <label>Kelompok</label>
+      <select name="kelompok_id">
+        <option value="">Pilih salah satu opsi</option>
+        {% for k in kelompok %}
+        <option value="{{ k.id }}">{{ k.nama }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label>No Urut Rapor<span class="wajib">*</span></label>
+      <input type="number" name="urutan" min="0" required>
+    </div>
+  </div>
+  <div class="form-actions">
+    <button class="btn btn-amber" name="aksi" value="simpan" type="submit">Buat</button>
+    <button class="btn btn-ghost" name="aksi" value="lagi" type="submit">Buat & buat lainnya</button>
+    <a class="btn btn-ghost" href="{{ url_for('main.mapping_rapor') }}">Batal</a>
+  </div>
+</form>
+<script>
+document.getElementById("mapel-mapping").addEventListener("change", function () {
+  var nama = document.getElementById("nama-lokal");
+  if (!nama.value && this.value) nama.value = this.options[this.selectedIndex].text;
+});
+</script>
+{% endblock %}

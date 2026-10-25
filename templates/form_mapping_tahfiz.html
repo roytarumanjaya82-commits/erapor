@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}{% if row.id %}Ubah Tahfiz Guru{% else %}Buat Tahfiz Guru{% endif %}{% endblock %}
+{% block content_class %}content-wide{% endblock %}
+{% block content %}
+<div class="crumb">Mapping Guru Tahfiz <span>›</span> {% if row.id %}Ubah{% else %}Buat{% endif %}</div>
+<div class="page-head">
+  <h1 class="page-title">{% if row.id %}Ubah Tahfiz Guru{% else %}Buat Tahfiz Guru{% endif %}</h1>
+  {% if row.id %}
+  <button class="btn btn-solid-danger" type="button" onclick="document.getElementById('hapus-mapping').classList.add('open')">Hapus</button>
+  {% endif %}
+</div>
+<form method="post">
+  <div class="form-grid">
+    <div>
+      <label>Guru Tahfiz<span class="wajib">*</span></label>
+      <div class="select-row">
+        <select name="guru_id" required>
+          <option value="">Pilih salah satu opsi</option>
+          {% for g in guru %}
+          <option value="{{ g.id }}" {% if row.guru_id == g.id %}selected{% endif %}>{{ g.nama }}</option>
+          {% endfor %}
+        </select>
+        <button class="select-x" type="button" onclick="this.previousElementSibling.value=''" aria-label="Kosongkan">×</button>
+      </div>
+    </div>
+    <div>
+      <label>Rombongan Belajar / Kelas Tahfiz<span class="wajib">*</span></label>
+      <div class="select-row">
+        <select name="kelas_id" required>
+          <option value="">Pilih salah satu opsi</option>
+          {% for k in kelas %}
+          <option value="{{ k.id }}" {% if row.kelas_id == k.id %}selected{% endif %}>{{ k.nama }}</option>
+          {% endfor %}
+        </select>
+        <button class="select-x" type="button" onclick="this.previousElementSibling.value=''" aria-label="Kosongkan">×</button>
+      </div>
+    </div>
+  </div>
+  <div class="form-actions">
+    <button class="btn btn-amber" name="aksi" value="simpan" type="submit">{% if row.id %}Simpan{% else %}Buat{% endif %}</button>
+    {% if not row.id %}<button class="btn btn-ghost" name="aksi" value="lagi" type="submit">Buat & buat lainnya</button>{% endif %}
+    <a class="btn btn-ghost" href="{{ url_for('main.mapping_tahfiz') }}">Batal</a>
+  </div>
+</form>
+{% if row.id %}
+<div class="modal-back" id="hapus-mapping" onclick="if (event.target === this) this.classList.remove('open')">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="judul-hapus-mapping">
+    <button class="modal-x" type="button" onclick="document.getElementById('hapus-mapping').classList.remove('open')" aria-label="Tutup">×</button>
+    <div class="modal-icon" aria-hidden="true">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M9 7V5h6v2M8 7l1 13h6l1-13"/></svg>
+    </div>
+    <h3 id="judul-hapus-mapping">Hapus Mapping Guru Tahfiz</h3>
+    <p>Apakah Anda yakin ingin melakukan ini?</p>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" type="button" onclick="document.getElementById('hapus-mapping').classList.remove('open')">Batal</button>
+      <form method="post" action="{{ url_for('main.hapus_mapping_tahfiz', item_id=row.id) }}">
+        <button class="btn btn-solid-danger" type="submit">Hapus</button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

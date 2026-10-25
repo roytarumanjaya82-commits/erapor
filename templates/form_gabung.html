@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}{% if row.id %}Ubah Gabung Mapel{% else %}Buat Gabung Mapel{% endif %}{% endblock %}
+{% block content_class %}content-wide{% endblock %}
+{% block content %}
+<div class="crumb">Gabung Mapel <span>›</span> {% if row.id %}Ubah{% else %}Buat{% endif %}</div>
+<div class="page-head">
+  <h1 class="page-title">{% if row.id %}Ubah Gabung Mapel{% else %}Buat Gabung Mapel{% endif %}</h1>
+  {% if row.id %}
+  <button class="btn btn-solid-danger" type="button" onclick="document.getElementById('hapus-gabung').classList.add('open')">Hapus</button>
+  {% endif %}
+</div>
+<form method="post">
+  <div class="form-grid">
+    <div class="full">
+      <label>Nama Penggabungan Mapel<span class="wajib">*</span></label>
+      <input type="text" name="nama_gabungan" value="{{ row.nama_gabungan or '' }}" required>
+    </div>
+  </div>
+  <div class="form-actions">
+    <button class="btn btn-amber" name="aksi" value="simpan" type="submit">{% if row.id %}Simpan{% else %}Buat{% endif %}</button>
+    {% if not row.id %}<button class="btn btn-ghost" name="aksi" value="lagi" type="submit">Buat & buat lainnya</button>{% endif %}
+    <a class="btn btn-ghost" href="{{ url_for('main.gabung_mapel') }}">Batal</a>
+  </div>
+</form>
+{% if row.id %}
+<div class="modal-back" id="hapus-gabung" onclick="if (event.target === this) this.classList.remove('open')">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="judul-hapus-gabung">
+    <button class="modal-x" type="button" onclick="document.getElementById('hapus-gabung').classList.remove('open')" aria-label="Tutup">×</button>
+    <div class="modal-icon" aria-hidden="true">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M9 7V5h6v2M8 7l1 13h6l1-13"/></svg>
+    </div>
+    <h3 id="judul-hapus-gabung">Hapus Gabung Mapel</h3>
+    <p>Apakah Anda yakin ingin melakukan ini?</p>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" type="button" onclick="document.getElementById('hapus-gabung').classList.remove('open')">Batal</button>
+      <form method="post" action="{{ url_for('main.hapus_gabung', item_id=row.id) }}">
+        <button class="btn btn-solid-danger" type="submit">Hapus</button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

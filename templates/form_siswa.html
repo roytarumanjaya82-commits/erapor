@@ -1,49 +1,97 @@
 {% extends "base.html" %}
-{% block title %}Form Siswa{% endblock %}
+{% block title %}{% if row.id %}Ubah Peserta Didik{% else %}Buat Peserta Didik{% endif %}{% endblock %}
+{% block content_class %}content-wide{% endblock %}
 {% block content %}
-<h1 class="page-title">{% if row.id %}Ubah Siswa{% else %}Tambah Siswa{% endif %}</h1>
-<div class="card">
-  <form method="post">
-    <div class="form-grid">
-      <div><label>NIS</label><input type="text" name="nis" value="{{ row.nis or '' }}" required></div>
-      <div><label>NISN</label><input type="text" name="nisn" value="{{ row.nisn or '' }}"></div>
-      <div><label>Nama</label><input type="text" name="nama" value="{{ row.nama or '' }}" required></div>
-      <div>
-        <label>Jenis kelamin</label>
-        <select name="jenis_kelamin">
-          <option value="L" {% if row.jenis_kelamin=='L' %}selected{% endif %}>Laki-laki</option>
-          <option value="P" {% if row.jenis_kelamin=='P' %}selected{% endif %}>Perempuan</option>
-        </select>
-      </div>
-      <div><label>Tempat lahir</label><input type="text" name="tempat_lahir" value="{{ row.tempat_lahir or '' }}"></div>
-      <div><label>Tanggal lahir</label><input type="date" name="tanggal_lahir" value="{{ row.tanggal_lahir|iso }}"></div>
-      <div><label>Agama</label><input type="text" name="agama" value="{{ row.agama or 'Islam' }}"></div>
-      <div>
-        <label>Kelas</label>
-        <select name="kelas_id">
-          <option value="">-</option>
-          {% for k in kelas %}
-          <option value="{{ k.id }}" {% if row.kelas_id==k.id %}selected{% endif %}>{{ k.nama }}</option>
-          {% endfor %}
-        </select>
-      </div>
-      <div><label>Nama ayah</label><input type="text" name="nama_ayah" value="{{ row.nama_ayah or '' }}"></div>
-      <div><label>Nama ibu</label><input type="text" name="nama_ibu" value="{{ row.nama_ibu or '' }}"></div>
-      <div><label>No. HP</label><input type="text" name="no_hp" value="{{ row.no_hp or '' }}"></div>
-      <div>
-        <label>Status</label>
-        <select name="status">
-          {% for s in ['aktif','lulus','pindah','dropout'] %}
-          <option value="{{ s }}" {% if row.status==s %}selected{% endif %}>{{ s }}</option>
-          {% endfor %}
-        </select>
-      </div>
-      <div class="full"><label>Alamat</label><textarea name="alamat">{{ row.alamat or '' }}</textarea></div>
-    </div>
-    <div class="form-actions">
-      <button class="btn btn-primary">Simpan</button>
-      <a class="btn btn-ghost" href="{{ url_for('main.data_siswa') }}">Batal</a>
-    </div>
-  </form>
+<div class="crumb">Data Siswa <span>›</span> {% if row.id %}Ubah{% else %}Buat{% endif %}</div>
+<div class="page-head">
+  <h1 class="page-title">{% if row.id %}Ubah Peserta Didik{% else %}Buat Peserta Didik{% endif %}</h1>
+  {% if row.id %}
+  <button class="btn btn-solid-danger" type="button" onclick="document.getElementById('hapus-siswa').classList.add('open')">Hapus</button>
+  {% endif %}
 </div>
+<form method="post">
+  <div class="school-grid">
+    <div class="card">
+      <h3 class="section-title">Informasi Utama Siswa</h3>
+      <p class="sub">Perbarui nama lengkap, nomor induk siswa, dan penempatan kelas.</p>
+      <div class="form-grid">
+        <div class="full">
+          <label>Nama Lengkap Siswa<span class="wajib">*</span></label>
+          <input type="text" name="nama" value="{{ row.nama or '' }}" required>
+          <p class="hint">Pastikan penulisan nama lengkap sesuai dengan akta kelahiran / ijazah resmi.</p>
+        </div>
+        <div>
+          <label>NISN</label>
+          <input type="text" name="nisn" value="{{ row.nisn or '' }}" placeholder="Contoh: 0095019155">
+          <p class="hint">Nomor Induk Siswa Nasional resmi (10 digit).</p>
+        </div>
+        <div>
+          <label>NIS / NIPD</label>
+          <input type="text" name="nis" value="{{ row.nis or '' }}" placeholder="Nomor Induk Lokal Sekolah" required>
+          <p class="hint">Nomor induk siswa lokal di buku induk sekolah.</p>
+        </div>
+        <div class="full">
+          <label>Kelas / Rombongan Belajar<span class="wajib">*</span></label>
+          <select name="kelas_id" required>
+            <option value="">Pilih salah satu opsi</option>
+            {% for k in kelas %}
+            <option value="{{ k.id }}" {% if row.kelas_id == k.id %}selected{% endif %}>{{ k.nama }}</option>
+            {% endfor %}
+          </select>
+          <p class="hint">Pilih rombongan belajar reguler aktif semester berjalan.</p>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <h3 class="section-title">Identitas Pribadi & Biodata</h3>
+      <p class="sub">Data nomor induk kependudukan, tempat dan tanggal lahir, serta jenis kelamin.</p>
+      <div class="form-grid">
+        <div>
+          <label>Jenis Kelamin<span class="wajib">*</span></label>
+          <select name="jenis_kelamin" required>
+            <option value="">Pilih salah satu opsi</option>
+            <option value="L" {% if row.jenis_kelamin=='L' %}selected{% endif %}>Laki-laki</option>
+            <option value="P" {% if row.jenis_kelamin=='P' %}selected{% endif %}>Perempuan</option>
+          </select>
+        </div>
+        <div>
+          <label>NIK (Nomor Induk Kependudukan)</label>
+          <input type="text" name="nik" value="{{ row.nik or '' }}" maxlength="16" placeholder="16 digit NIK" inputmode="numeric">
+          <p class="hint">Nomor NIK sesuai Kartu Keluarga (KK).</p>
+        </div>
+        <div>
+          <label>Tempat Lahir</label>
+          <input type="text" name="tempat_lahir" value="{{ row.tempat_lahir or '' }}" placeholder="Kota / Kabupaten tempat lahir">
+        </div>
+        <div>
+          <label>Tanggal Lahir</label>
+          <input type="date" name="tanggal_lahir" value="{{ row.tanggal_lahir|iso }}">
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="form-actions">
+    <button class="btn btn-amber" name="aksi" value="simpan" type="submit">{% if row.id %}Simpan{% else %}Buat{% endif %}</button>
+    {% if not row.id %}<button class="btn btn-ghost" name="aksi" value="lagi" type="submit">Buat & buat lainnya</button>{% endif %}
+    <a class="btn btn-ghost" href="{{ url_for('main.data_siswa') }}">Batal</a>
+  </div>
+</form>
+{% if row.id %}
+<div class="modal-back" id="hapus-siswa" onclick="if (event.target === this) this.classList.remove('open')">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="judul-hapus-siswa">
+    <button class="modal-x" type="button" onclick="document.getElementById('hapus-siswa').classList.remove('open')" aria-label="Tutup">×</button>
+    <div class="modal-icon" aria-hidden="true">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M9 7V5h6v2M8 7l1 13h6l1-13"/></svg>
+    </div>
+    <h3 id="judul-hapus-siswa">Hapus Peserta Didik</h3>
+    <p>Apakah Anda yakin ingin melakukan ini?</p>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" type="button" onclick="document.getElementById('hapus-siswa').classList.remove('open')">Batal</button>
+      <form method="post" action="{{ url_for('main.hapus_siswa', item_id=row.id) }}">
+        <button class="btn btn-solid-danger" type="submit">Hapus</button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endif %}
 {% endblock %}

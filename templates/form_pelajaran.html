@@ -1,34 +1,87 @@
 {% extends "base.html" %}
-{% block title %}Form Pelajaran{% endblock %}
+{% block title %}{% if row.id %}Ubah Pembelajaran{% else %}Buat Pembelajaran{% endif %}{% endblock %}
+{% block content_class %}content-wide{% endblock %}
 {% block content %}
-<h1 class="page-title">{% if row.id %}Ubah Pembelajaran{% else %}Tambah Pembelajaran{% endif %}</h1>
-<div class="card">
-  <form method="post">
-    <div class="form-grid">
-      <div>
-        <label>Kelas</label>
-        <select name="kelas_id" required>
-          {% for k in kelas %}<option value="{{ k.id }}" {% if row.kelas_id==k.id %}selected{% endif %}>{{ k.nama }}</option>{% endfor %}
-        </select>
-      </div>
-      <div>
-        <label>Mata pelajaran</label>
-        <select name="mapel_id" required>
-          {% for m in mapel %}<option value="{{ m.id }}" {% if row.mapel_id==m.id %}selected{% endif %}>{{ m.nama }}</option>{% endfor %}
-        </select>
-      </div>
-      <div>
-        <label>Guru</label>
-        <select name="guru_id" required>
-          {% for g in guru %}<option value="{{ g.id }}" {% if row.guru_id==g.id %}selected{% endif %}>{{ g.nama }}</option>{% endfor %}
-        </select>
-      </div>
-      <div><label>Jam per minggu</label><input type="number" name="jam_per_minggu" value="{{ row.jam_per_minggu or 2 }}"></div>
-    </div>
-    <div class="form-actions">
-      <button class="btn btn-primary">Simpan</button>
-      <a class="btn btn-ghost" href="{{ url_for('main.data_pelajaran') }}">Batal</a>
-    </div>
-  </form>
+<div class="crumb">Data Pembelajaran <span>›</span> {% if row.id %}Ubah{% else %}Buat{% endif %}</div>
+<div class="page-head">
+  <h1 class="page-title">{% if row.id %}Ubah Pembelajaran{% else %}Buat Pembelajaran{% endif %}</h1>
+  {% if row.id %}
+  <button class="btn btn-solid-danger" type="button" onclick="document.getElementById('hapus-pelajaran').classList.add('open')">Hapus</button>
+  {% endif %}
 </div>
+<form method="post">
+  <div class="form-grid">
+    <div>
+      <label>ID Pembelajaran (Otomatis System)</label>
+      <input class="kode-otomatis" type="text" name="kode" value="{{ kode }}" readonly>
+    </div>
+    <div>
+      <label>Rombongan Belajar / Kelas<span class="wajib">*</span></label>
+      <div class="select-row">
+        <select name="kelas_id" required>
+          <option value="">Pilih salah satu opsi</option>
+          {% for k in kelas %}
+          <option value="{{ k.id }}" {% if row.kelas_id == k.id %}selected{% endif %}>{{ k.nama }}</option>
+          {% endfor %}
+        </select>
+        <button class="select-x" type="button" onclick="this.previousElementSibling.value=''" aria-label="Kosongkan">×</button>
+      </div>
+    </div>
+    <div>
+      <label>Mata Pelajaran<span class="wajib">*</span></label>
+      <div class="select-row">
+        <select name="mapel_id" required>
+          <option value="">Pilih salah satu opsi</option>
+          {% for m in mapel %}
+          <option value="{{ m.id }}" {% if row.mapel_id == m.id %}selected{% endif %}>{{ m.nama }}</option>
+          {% endfor %}
+        </select>
+        <button class="select-x" type="button" onclick="this.previousElementSibling.value=''" aria-label="Kosongkan">×</button>
+      </div>
+    </div>
+    <div>
+      <label>Guru Pengajar</label>
+      <div class="select-row">
+        <select name="guru_id">
+          <option value="">Pilih salah satu opsi</option>
+          {% for g in guru %}
+          <option value="{{ g.id }}" {% if row.guru_id == g.id %}selected{% endif %}>{{ g.nama }}</option>
+          {% endfor %}
+        </select>
+        <button class="select-x" type="button" onclick="this.previousElementSibling.value=''" aria-label="Kosongkan">×</button>
+      </div>
+    </div>
+    <div>
+      <label>Jam Mengajar per Minggu</label>
+      <input type="number" name="jam_per_minggu" min="0" value="{{ row.jam_per_minggu if row.jam_per_minggu is not none else '' }}">
+    </div>
+    <div>
+      <label>Status di Kurikulum</label>
+      <input type="text" name="status_kurikulum" value="{{ row.status_kurikulum or '' }}">
+    </div>
+  </div>
+  <div class="form-actions">
+    <button class="btn btn-amber" name="aksi" value="simpan" type="submit">{% if row.id %}Simpan{% else %}Buat{% endif %}</button>
+    {% if not row.id %}<button class="btn btn-ghost" name="aksi" value="lagi" type="submit">Buat & buat lainnya</button>{% endif %}
+    <a class="btn btn-ghost" href="{{ url_for('main.data_pelajaran') }}">Batal</a>
+  </div>
+</form>
+{% if row.id %}
+<div class="modal-back" id="hapus-pelajaran" onclick="if (event.target === this) this.classList.remove('open')">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="judul-hapus-pelajaran">
+    <button class="modal-x" type="button" onclick="document.getElementById('hapus-pelajaran').classList.remove('open')" aria-label="Tutup">×</button>
+    <div class="modal-icon" aria-hidden="true">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M9 7V5h6v2M8 7l1 13h6l1-13"/></svg>
+    </div>
+    <h3 id="judul-hapus-pelajaran">Hapus Pembelajaran</h3>
+    <p>Apakah Anda yakin ingin melakukan ini?</p>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" type="button" onclick="document.getElementById('hapus-pelajaran').classList.remove('open')">Batal</button>
+      <form method="post" action="{{ url_for('main.hapus_pelajaran', item_id=row.id) }}">
+        <button class="btn btn-solid-danger" type="submit">Hapus</button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endif %}
 {% endblock %}

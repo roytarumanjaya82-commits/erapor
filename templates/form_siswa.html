@@ -16,7 +16,7 @@
         </select>
       </div>
       <div><label>Tempat lahir</label><input type="text" name="tempat_lahir" value="{{ row.tempat_lahir or '' }}"></div>
-      <div><label>Tanggal lahir</label><input type="date" name="tanggal_lahir" value="{{ row.tanggal_lahir or '' }}"></div>
+      <div><label>Tanggal lahir</label><input type="date" name="tanggal_lahir" value="{{ row.tanggal_lahir|iso }}"></div>
       <div><label>Agama</label><input type="text" name="agama" value="{{ row.agama or 'Islam' }}"></div>
       <div>
         <label>Kelas</label>

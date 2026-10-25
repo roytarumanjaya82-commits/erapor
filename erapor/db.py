@@ -1,3 +1,5 @@
+from contextlib import contextmanager
+
 import pymysql
 from flask import current_app, g
 
@@ -13,6 +15,7 @@ def get_conn():
             charset="utf8mb4",
             cursorclass=pymysql.cursors.DictCursor,
             autocommit=True,
+            init_command="SET SESSION sql_mode='STRICT_TRANS_TABLES,NO_ZERO_DATE,NO_ZERO_IN_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION'",
         )
     return g.db
 
@@ -39,6 +42,20 @@ def close_db(_e=None):
     db = g.pop("db", None)
     if db is not None:
         db.close()
+
+
+@contextmanager
+def transaction():
+    conn = get_conn()
+    conn.autocommit(False)
+    try:
+        yield
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.autocommit(True)
 
 
 def init_app(app):

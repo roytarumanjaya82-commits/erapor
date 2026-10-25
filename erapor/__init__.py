@@ -1,4 +1,5 @@
-from flask import Flask, g, session
+import pymysql
+from flask import Flask, flash, redirect, request, session, url_for
 from .config import Config
 from .db import init_app, query
 
@@ -9,7 +10,7 @@ def create_app():
     init_app(app)
 
     from .auth import bp as auth_bp
-    from .routes import bp as main_bp
+    from .routes import InputError, bp as main_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(main_bp)
@@ -30,5 +31,34 @@ def create_app():
         except Exception:
             ta = None
         return {"current_user": user, "tahun_aktif": ta}
+
+    def _back():
+        ref = request.referrer or ""
+        if ref.startswith(request.host_url):
+            return redirect(ref)
+        return redirect(url_for("main.dashboard"))
+
+    @app.errorhandler(pymysql.err.IntegrityError)
+    def handle_integrity(_e):
+        flash("Data tidak bisa disimpan karena bentrok atau masih terkait data lain.", "error")
+        return _back()
+
+    @app.errorhandler(pymysql.err.DataError)
+    def handle_data(_e):
+        flash("Format data tidak valid. Periksa angka, tanggal, dan panjang isian.", "error")
+        return _back()
+
+    @app.errorhandler(InputError)
+    def handle_value(_e):
+        flash("Ada nilai yang bukan angka antara 0 dan 100.", "error")
+        return _back()
+
+    @app.template_filter("iso")
+    def iso_date(value):
+        if not value:
+            return ""
+        if hasattr(value, "strftime"):
+            return value.strftime("%Y-%m-%d")
+        return str(value)[:10]
 
     return app

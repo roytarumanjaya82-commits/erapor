@@ -6,6 +6,7 @@
   <form method="post">
     <div class="form-grid">
       <div><label>Nama</label><input type="text" name="nama" value="{{ row.nama or '' }}" required></div>
+      <div><label>Gelar depan</label><input type="text" name="gelar_depan" value="{{ row.gelar_depan or '' }}"></div>
       <div><label>Gelar belakang</label><input type="text" name="gelar_belakang" value="{{ row.gelar_belakang or '' }}"></div>
       <div><label>NIP</label><input type="text" name="nip" value="{{ row.nip or '' }}"></div>
       <div><label>NUPTK</label><input type="text" name="nuptk" value="{{ row.nuptk or '' }}"></div>
@@ -17,7 +18,7 @@
         </select>
       </div>
       <div><label>Tempat lahir</label><input type="text" name="tempat_lahir" value="{{ row.tempat_lahir or '' }}"></div>
-      <div><label>Tanggal lahir</label><input type="date" name="tanggal_lahir" value="{{ row.tanggal_lahir or '' }}"></div>
+      <div><label>Tanggal lahir</label><input type="date" name="tanggal_lahir" value="{{ row.tanggal_lahir|iso }}"></div>
       <div><label>Agama</label><input type="text" name="agama" value="{{ row.agama or 'Islam' }}"></div>
       <div><label>No. HP</label><input type="text" name="no_hp" value="{{ row.no_hp or '' }}"></div>
       <div><label>Email</label><input type="email" name="email" value="{{ row.email or '' }}"></div>

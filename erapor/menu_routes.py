@@ -647,10 +647,33 @@ def _alamat_sekolah(sekolah):
     return teks or "-"
 
 
+def _tanggal_rapor(nilai):
+    bulan = (
+        "", "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+        "Juli", "Agustus", "September", "Oktober", "November", "Desember",
+    )
+    if not nilai or not hasattr(nilai, "day"):
+        return ""
+    return f"{nilai.day} {bulan[nilai.month]} {nilai.year}"
+
+
+def _nama_wali(siswa):
+    if not siswa or not siswa.get("wali_nama"):
+        return "", ""
+    nama = " ".join(bagian for bagian in (siswa.get("gelar_depan"), siswa.get("wali_nama")) if bagian)
+    if siswa.get("gelar_belakang"):
+        nama = f"{nama}, {siswa['gelar_belakang']}"
+    return nama, siswa.get("nbm") or siswa.get("wali_nip") or ""
+
+
 def _paket_rapor(siswa_id):
     siswa = query(
-        """SELECT s.id, s.nama, s.nis, s.nisn, s.kelas_id, k.nama AS kelas_nama, k.tingkat
-           FROM siswa s LEFT JOIN kelas k ON k.id=s.kelas_id WHERE s.id=%s""",
+        """SELECT s.id, s.nama, s.nis, s.nisn, s.kelas_id, k.nama AS kelas_nama, k.tingkat,
+                  g.nama AS wali_nama, g.gelar_depan, g.gelar_belakang, g.nbm, g.nip AS wali_nip
+           FROM siswa s
+           LEFT JOIN kelas k ON k.id=s.kelas_id
+           LEFT JOIN guru g ON g.id=k.wali_kelas_id
+           WHERE s.id=%s""",
         (siswa_id,),
         one=True,
     )
@@ -675,6 +698,16 @@ def _paket_rapor(siswa_id):
         (siswa["kelas_id"], ta.get("id"), ta.get("id"), siswa_id, siswa_id),
     )
     semester = ta.get("semester") or 0
+    wali, nbm_wali = _nama_wali(siswa)
+    ekskul = query(
+        """SELECT e.nama, n.nilai
+           FROM peserta_ekskul p
+           JOIN ekstrakurikuler e ON e.id=p.ekskul_id
+           LEFT JOIN nilai_ekskul n ON n.ekskul_id=e.id AND n.siswa_id=p.siswa_id
+           WHERE p.siswa_id=%s
+           ORDER BY e.nama""",
+        (siswa_id,),
+    )
     return {
         "sekolah": sekolah.get("nama") or "SMP Muhammadiyah 22 Setiabudi Pamulang",
         "alamat": _alamat_sekolah(sekolah),
@@ -687,6 +720,19 @@ def _paket_rapor(siswa_id):
         "tahun": ta.get("tahun") or "-",
         "mapel": mapel,
         "kelas_nama": siswa["kelas_nama"] or "kelas",
+        "sikap": "",
+        "presensi": (
+            ("Sakit", "- Hari"),
+            ("Izin", "- Hari"),
+            ("Tanpa Keterangan", "- Hari"),
+        ),
+        "ekskul": ekskul,
+        "tempat": sekolah.get("tempat_rapor") or "",
+        "tanggal": _tanggal_rapor(sekolah.get("tanggal_rapor")),
+        "wali": wali,
+        "nbm_wali": nbm_wali,
+        "kepala": sekolah.get("kepala_sekolah") or "",
+        "nbm_kepala": sekolah.get("nip_kepala") or "",
     }
 
 
@@ -1589,8 +1635,12 @@ def _boleh_tahfiz(kelas_id):
 
 def _paket_tahfiz(siswa_id):
     siswa = query(
-        """SELECT s.id, s.nama, s.nis, s.nisn, s.kelas_id, k.nama AS kelas_nama, k.tingkat
-           FROM siswa s LEFT JOIN kelas k ON k.id=s.kelas_id WHERE s.id=%s""",
+        """SELECT s.id, s.nama, s.nis, s.nisn, s.kelas_id, k.nama AS kelas_nama, k.tingkat,
+                  g.nama AS wali_nama, g.gelar_depan, g.gelar_belakang, g.nbm, g.nip AS wali_nip
+           FROM siswa s
+           LEFT JOIN kelas k ON k.id=s.kelas_id
+           LEFT JOIN guru g ON g.id=k.wali_kelas_id
+           WHERE s.id=%s""",
         (siswa_id,),
         one=True,
     )
@@ -1598,6 +1648,7 @@ def _paket_tahfiz(siswa_id):
         return None
     ta = query("SELECT * FROM tahun_ajaran WHERE aktif=1 LIMIT 1", one=True) or {}
     sekolah = query("SELECT * FROM sekolah ORDER BY id LIMIT 1", one=True) or {}
+    atur = query("SELECT * FROM pengaturan_rapor_tahfiz ORDER BY id LIMIT 1", one=True) or {}
     aspek = query("SELECT id, nama FROM aspek_tahfiz WHERE aktif=1 ORDER BY urutan, id")
     nilai = {}
     if ta.get("id"):
@@ -1611,6 +1662,12 @@ def _paket_tahfiz(siswa_id):
         isi = nilai.get(item["id"]) or {}
         deskripsi = (isi.get("deskripsi") or "").strip() or (isi.get("predikat") or "").strip()
         mapel.append({"nama": item["nama"], "nilai": isi.get("nilai"), "deskripsi": deskripsi or "-"})
+    wali, nbm_wali = _nama_wali(siswa)
+    masehi = (atur.get("tanggal_masehi") or "").strip()
+    if not masehi:
+        masehi = _tanggal_rapor(sekolah.get("tanggal_rapor"))
+        if masehi:
+            masehi = f"{masehi} M"
     return {
         "sekolah": sekolah.get("nama") or "SMP Muhammadiyah 22 Setiabudi Pamulang",
         "alamat": _alamat_sekolah(sekolah),
@@ -1623,6 +1680,13 @@ def _paket_tahfiz(siswa_id):
         "mapel": mapel,
         "kelas_nama": siswa["kelas_nama"] or "kelas",
         "kelas_id": siswa["kelas_id"],
+        "tempat": (atur.get("tempat_cetak") or "").strip() or sekolah.get("tempat_rapor") or "",
+        "tanggal_hijriah": (atur.get("tanggal_hijriah") or "").strip(),
+        "tanggal_masehi": masehi,
+        "wali": wali,
+        "nbm_wali": nbm_wali,
+        "kepala": (atur.get("nama_kepala") or "").strip() or sekolah.get("kepala_sekolah") or "",
+        "nbm_kepala": (atur.get("nbm_kepala") or "").strip() or sekolah.get("nip_kepala") or "",
     }
 
 

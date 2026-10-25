@@ -1,4 +1,5 @@
 import os
+from datetime import datetime
 from io import BytesIO
 from zipfile import ZipFile
 
@@ -10,6 +11,7 @@ from werkzeug.security import generate_password_hash
 from .access import ENDPOINT_TUGAS
 from .auth import login_required
 from .db import execute, query, transaction
+from .rapor_pdf import buat_pdf, buat_pdf_tahfiz
 
 bp = Blueprint("menu", __name__)
 
@@ -20,6 +22,8 @@ ENDPOINT_TUGAS.update(
         "menu.leger_unduh": {"admin", "walas", "bidang_studi"},
         "menu.leger_unduh_semua": {"admin", "walas", "bidang_studi"},
         "menu.cetak_rapor": {"admin", "walas"},
+        "menu.atur_tanggal_rapor": {"admin"},
+        "menu.cetak_rapor_pdf": {"admin", "walas"},
         "menu.rapor_siswa": {"admin", "walas"},
         "menu.publik": {"admin", "bidang_studi", "walas", "ekskul", "tahfidz"},
         "menu.dapodik": {"admin"},
@@ -45,6 +49,8 @@ ENDPOINT_TUGAS.update(
         "menu.toggle_predikat": {"admin"},
         "menu.hapus_predikat": {"admin"},
         "menu.cetak_tahfiz": {"admin", "tahfidz", "walas"},
+        "menu.cetak_tahfiz_pdf": {"admin", "tahfidz", "walas"},
+        "menu.cetak_tahfiz_siswa": {"admin", "tahfidz", "walas"},
         "menu.nilai_mapel": {"admin", "bidang_studi"},
         "menu.simpan_nilai_mapel": {"admin", "bidang_studi"},
         "menu.nilai_ekskul": {"admin", "ekskul"},
@@ -98,29 +104,206 @@ def _kelas_scope():
     return list(unik.values())
 
 
-@bp.route("/monitoring/publik")
-@login_required
-def publik():
-    ta_id = _ta_id()
-    pelajaran = query("SELECT COUNT(*) AS n FROM pelajaran WHERE tahun_ajaran_id=%s", (ta_id,), one=True)["n"] if ta_id else 0
-    lengkap = query(
-        """SELECT COUNT(*) AS n FROM pelajaran pel
-           WHERE pel.tahun_ajaran_id=%s
-             AND (SELECT COUNT(*) FROM siswa s WHERE s.kelas_id=pel.kelas_id AND s.status='aktif') > 0
-             AND (SELECT COUNT(*) FROM nilai_sumatif ns WHERE ns.pelajaran_id=pel.id)
-                 >= (SELECT COUNT(*) FROM siswa s WHERE s.kelas_id=pel.kelas_id AND s.status='aktif')""",
-        (ta_id,),
-        one=True,
-    )["n"] if ta_id else 0
-    stats = {
-        "pelajaran": pelajaran,
+def _pct(bagian, total):
+    if not total:
+        return 0
+    return round(bagian * 1000 / total) / 10
+
+
+def _nama_tampilan(row):
+    depan = (row.get("gelar_depan") or "").strip()
+    belakang = (row.get("gelar_belakang") or "").strip()
+    nama = (row.get("nama") or "").strip()
+    teks = f"{depan} {nama}".strip() if depan else nama
+    if belakang:
+        teks = f"{teks}, {belakang}"
+    return teks
+
+
+def _keadaan_mapel(siswa, formatif, sumatif):
+    if siswa and formatif >= siswa and sumatif >= siswa:
+        return "lengkap"
+    if formatif or sumatif:
+        return "proses"
+    return "belum"
+
+
+def _ringkas(daftar):
+    lengkap = sum(1 for item in daftar if item["keadaan"] == "lengkap")
+    proses = sum(1 for item in daftar if item["keadaan"] == "proses")
+    belum = sum(1 for item in daftar if item["keadaan"] == "belum")
+    total = len(daftar)
+    if total and lengkap == total:
+        status = "tuntas"
+    elif lengkap or proses:
+        status = "proses"
+    else:
+        status = "belum"
+    return {
+        "mapel": daftar,
+        "total": total,
         "lengkap": lengkap,
-        "pct": round(lengkap * 100 / pelajaran) if pelajaran else 0,
-        "guru": query("SELECT COUNT(*) AS n FROM guru WHERE aktif=1", one=True)["n"],
-        "kelas": query("SELECT COUNT(*) AS n FROM kelas", one=True)["n"],
-        "siswa": query("SELECT COUNT(*) AS n FROM siswa WHERE status='aktif'", one=True)["n"],
+        "proses": proses,
+        "belum": belum,
+        "pct": _pct(lengkap, total),
+        "status": status,
     }
-    return render_template("menu/publik.html", stats=stats, nav="publik")
+
+
+def _data_publik():
+    ta = query("SELECT id, tahun, semester FROM tahun_ajaran WHERE aktif=1 LIMIT 1", one=True)
+    ta_id = ta["id"] if ta else None
+    sekolah = query("SELECT nama FROM sekolah ORDER BY id LIMIT 1", one=True) or {}
+    pelajaran = []
+    if ta_id:
+        pelajaran = query(
+            """SELECT pel.id, pel.guru_id, pel.kelas_id, k.nama AS kelas_nama, m.nama AS mapel_nama,
+                      (SELECT COUNT(*) FROM siswa s WHERE s.kelas_id=pel.kelas_id AND s.status='aktif') AS siswa_n,
+                      (SELECT COUNT(DISTINCT nf.siswa_id) FROM nilai_formatif nf WHERE nf.pelajaran_id=pel.id) AS formatif_n,
+                      (SELECT COUNT(DISTINCT ns.siswa_id) FROM nilai_sumatif ns WHERE ns.pelajaran_id=pel.id) AS sumatif_n,
+                      (SELECT COUNT(*) FROM perencanaan_penilaian pp WHERE pp.pelajaran_id=pel.id) AS ada_rencana
+               FROM pelajaran pel
+               JOIN kelas k ON k.id=pel.kelas_id
+               JOIN mata_pelajaran m ON m.id=pel.mapel_id
+               WHERE pel.tahun_ajaran_id=%s
+               ORDER BY k.nama, m.nama""",
+            (ta_id,),
+        )
+    for item in pelajaran:
+        item["keadaan"] = _keadaan_mapel(item["siswa_n"] or 0, item["formatif_n"] or 0, item["sumatif_n"] or 0)
+        item["ada_rencana"] = bool(item["ada_rencana"])
+    guru_rows = query(
+        """SELECT id, nama, gelar_depan, gelar_belakang, nip, nuptk
+           FROM guru
+           WHERE aktif=1 OR id IN (
+             SELECT guru_id FROM pelajaran WHERE tahun_ajaran_id=%s AND guru_id IS NOT NULL
+           )
+           ORDER BY nama""",
+        (ta_id or 0,),
+    )
+    kelas_rows = query(
+        """SELECT k.id, k.nama, k.tingkat, g.nama AS wali, g.gelar_belakang
+           FROM kelas k
+           LEFT JOIN guru g ON g.id=k.wali_kelas_id
+           ORDER BY FIELD(k.tingkat,'7','8','9'),
+                    CAST(SUBSTRING_INDEX(k.nama,'-',-1) AS UNSIGNED), k.nama"""
+    )
+    per_guru = {row["id"]: [] for row in guru_rows}
+    per_kelas = {row["id"]: [] for row in kelas_rows}
+    for item in pelajaran:
+        if item["guru_id"] in per_guru:
+            per_guru[item["guru_id"]].append(item)
+        if item["kelas_id"] in per_kelas:
+            per_kelas[item["kelas_id"]].append(item)
+    guru = []
+    for row in guru_rows:
+        ringkas = _ringkas(per_guru[row["id"]])
+        rombel = len({item["kelas_id"] for item in ringkas["mapel"]})
+        guru.append({
+            "id": row["id"],
+            "nama": _nama_tampilan(row),
+            "nomor": row["nuptk"] or row["nip"] or "-",
+            "rombel": rombel,
+            **ringkas,
+        })
+    kelas = []
+    for row in kelas_rows:
+        wali = row["wali"] or ""
+        if wali and row["gelar_belakang"] and row["gelar_belakang"] not in wali:
+            wali = f"{wali}, {row['gelar_belakang']}"
+        kelas.append({
+            "id": row["id"],
+            "nama": row["nama"],
+            "tingkat": row["tingkat"],
+            "wali": wali or "-",
+            **_ringkas(per_kelas[row["id"]]),
+        })
+    aspek = query("SELECT id, nama FROM aspek_tahfiz WHERE aktif=1 ORDER BY urutan, nama")
+    kelas_terpetakan = query("SELECT DISTINCT kelas_id FROM mapping_guru_tahfiz")
+    siswa_tahfiz = 0
+    if kelas_terpetakan:
+        tanda = ", ".join(["%s"] * len(kelas_terpetakan))
+        siswa_tahfiz = query(
+            f"SELECT COUNT(*) AS n FROM siswa WHERE status='aktif' AND kelas_id IN ({tanda})",
+            [item["kelas_id"] for item in kelas_terpetakan],
+            one=True,
+        )["n"]
+    program = []
+    terisi_total = 0
+    for item in aspek:
+        terisi = 0
+        if ta_id and kelas_terpetakan:
+            tanda = ", ".join(["%s"] * len(kelas_terpetakan))
+            terisi = query(
+                f"""SELECT COUNT(*) AS n FROM nilai_tahfiz n
+                    JOIN siswa s ON s.id=n.siswa_id
+                    WHERE n.aspek_id=%s AND n.tahun_ajaran_id=%s AND n.nilai IS NOT NULL
+                      AND s.status='aktif' AND s.kelas_id IN ({tanda})""",
+                [item["id"], ta_id, *[baris["kelas_id"] for baris in kelas_terpetakan]],
+                one=True,
+            )["n"]
+        terisi_total += terisi
+        program.append({
+            "nama": item["nama"],
+            "terisi": terisi,
+            "harapan": siswa_tahfiz,
+            "pct": _pct(terisi, siswa_tahfiz),
+        })
+    harapan = siswa_tahfiz * len(aspek)
+    sekolah_ringkas = _ringkas(pelajaran)
+    return {
+        "sekolah": sekolah.get("nama") or "eRapor SMPM22SETIABUDIPAMULANG",
+        "tahun": ta["tahun"] if ta else "-",
+        "semester": ta["semester"] if ta else "-",
+        "pelajaran": sekolah_ringkas["total"],
+        "lengkap": sekolah_ringkas["lengkap"],
+        "proses": sekolah_ringkas["proses"],
+        "belum": sekolah_ringkas["belum"],
+        "belum_rencana": sum(1 for item in pelajaran if item["keadaan"] == "belum" and not item["ada_rencana"]),
+        "pct": sekolah_ringkas["pct"],
+        "guru_total": len(guru),
+        "kelas_total": len(kelas),
+        "siswa": query("SELECT COUNT(*) AS n FROM siswa WHERE status='aktif'", one=True)["n"],
+        "guru": guru,
+        "kelas": kelas,
+        "program": program,
+        "tahfiz_terisi": terisi_total,
+        "tahfiz_harapan": harapan,
+        "tahfiz_pct": _pct(terisi_total, harapan),
+    }
+
+
+@bp.route("/monitoring/publik")
+def publik():
+    tab = request.args.get("tab") or "guru"
+    if tab not in ("guru", "kelas", "tahfiz"):
+        tab = "guru"
+    status = request.args.get("status") or "semua"
+    if status not in ("semua", "tuntas", "proses", "belum"):
+        status = "semua"
+    q = (request.args.get("q") or "").strip().lower()
+    data = _data_publik()
+    guru = data["guru"]
+    kelas = data["kelas"]
+    if q and tab == "guru":
+        guru = [item for item in guru if q in item["nama"].lower() or q in str(item["nomor"]).lower()]
+    if q and tab == "kelas":
+        kelas = [item for item in kelas if q in item["nama"].lower() or q in item["wali"].lower()]
+    if tab == "guru" and status != "semua":
+        guru = [item for item in guru if item["status"] == status]
+    sekarang = datetime.now()
+    bulan = ("", "Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des")
+    return render_template(
+        "menu/publik.html",
+        data=data,
+        guru=guru,
+        kelas=kelas,
+        tab=tab,
+        status=status,
+        q=request.args.get("q") or "",
+        diperbarui=f"{sekarang.day:02d} {bulan[sekarang.month]} {sekarang.year}, {sekarang.strftime('%H:%M')}",
+        nav="publik",
+    )
 
 
 @bp.route("/admin/audit")
@@ -431,66 +614,187 @@ def leger_unduh_semua():
     return send_file(arsip, as_attachment=True, download_name="leger-semua-kelas.zip", mimetype="application/zip")
 
 
+def _kelas_cetak():
+    if _is_admin():
+        return query(
+            """SELECT id, nama FROM kelas
+               ORDER BY FIELD(tingkat,'7','8','9'),
+                        CAST(SUBSTRING_INDEX(nama,'-',-1) AS UNSIGNED), nama"""
+        )
+    return query(
+        """SELECT id, nama FROM kelas WHERE wali_kelas_id=%s
+           ORDER BY FIELD(tingkat,'7','8','9'),
+                    CAST(SUBSTRING_INDEX(nama,'-',-1) AS UNSIGNED), nama""",
+        (_guru_id() or 0,),
+    )
+
+
+def _boleh_cetak_kelas(kelas_id):
+    if _is_admin():
+        return bool(query("SELECT id FROM kelas WHERE id=%s", (kelas_id,), one=True))
+    return bool(
+        query(
+            "SELECT id FROM kelas WHERE id=%s AND wali_kelas_id=%s",
+            (kelas_id, _guru_id() or 0),
+            one=True,
+        )
+    )
+
+
+def _alamat_sekolah(sekolah):
+    bagian = [sekolah.get("alamat"), sekolah.get("kelurahan"), sekolah.get("kecamatan"), sekolah.get("kabupaten")]
+    teks = ", ".join(str(item).strip() for item in bagian if item and str(item).strip())
+    return teks or "-"
+
+
+def _paket_rapor(siswa_id):
+    siswa = query(
+        """SELECT s.id, s.nama, s.nis, s.nisn, s.kelas_id, k.nama AS kelas_nama, k.tingkat
+           FROM siswa s LEFT JOIN kelas k ON k.id=s.kelas_id WHERE s.id=%s""",
+        (siswa_id,),
+        one=True,
+    )
+    if not siswa:
+        return None
+    ta = query("SELECT * FROM tahun_ajaran WHERE aktif=1 LIMIT 1", one=True) or {}
+    sekolah = query("SELECT * FROM sekolah ORDER BY id LIMIT 1", one=True) or {}
+    mapel = query(
+        """SELECT COALESCE(mr.nama_lokal, m.nama) AS nama,
+                  COALESCE(p.kkm, m.kkm_default, 75) AS kkm,
+                  nf.nilai AS formatif, ns.nilai AS sumatif
+           FROM mapping_rapor mr
+           JOIN mata_pelajaran m ON m.id=mr.mapel_id
+           JOIN kelas k ON k.id=%s AND k.tingkat=mr.tingkat
+           LEFT JOIN pelajaran pel ON pel.mapel_id=m.id AND pel.kelas_id=k.id
+                AND (%s IS NULL OR pel.tahun_ajaran_id=%s)
+           LEFT JOIN perencanaan_penilaian p ON p.pelajaran_id=pel.id
+           LEFT JOIN nilai_formatif nf ON nf.pelajaran_id=pel.id AND nf.siswa_id=%s
+           LEFT JOIN nilai_sumatif ns ON ns.pelajaran_id=pel.id AND ns.siswa_id=%s
+           WHERE mr.tampil_rapor=1
+           ORDER BY mr.urutan, m.nama""",
+        (siswa["kelas_id"], ta.get("id"), ta.get("id"), siswa_id, siswa_id),
+    )
+    semester = ta.get("semester") or 0
+    return {
+        "sekolah": sekolah.get("nama") or "SMP Muhammadiyah 22 Setiabudi Pamulang",
+        "alamat": _alamat_sekolah(sekolah),
+        "siswa": siswa["nama"],
+        "nisn": f"{siswa['nisn'] or '-'} / {siswa['nis'] or '-'}",
+        "kelas": siswa["kelas_nama"] or "-",
+        "fase": "D" if str(siswa["tingkat"]) in ("7", "8", "9") else "-",
+        "semester": "Ganjil" if semester == 1 else "Genap" if semester == 2 else "-",
+        "semester_angka": semester,
+        "tahun": ta.get("tahun") or "-",
+        "mapel": mapel,
+        "kelas_nama": siswa["kelas_nama"] or "kelas",
+    }
+
+
 @bp.route("/admin/cetak-rapor")
 @login_required
 def cetak_rapor():
-    if _is_admin():
-        kelas = _kelas_scope()
-    else:
-        kelas = query(
-            "SELECT id, nama FROM kelas WHERE wali_kelas_id=%s ORDER BY nama",
-            (_guru_id() or 0,),
-        )
+    kelas = _kelas_cetak()
     boleh = {str(item["id"]) for item in kelas}
     kelas_id = request.args.get("kelas_id") or ""
-    if str(kelas_id) not in boleh:
-        kelas_id = ""
+    if kelas_id not in boleh:
+        kelas_id = str(kelas[0]["id"]) if kelas else ""
+    q = (request.args.get("q") or "").strip()
+    urut = "nisn" if request.args.get("urut") == "nisn" else "nama"
+    arah = "DESC" if request.args.get("arah") == "desc" else "ASC"
+    siswa = []
+    if kelas_id:
+        where = "kelas_id=%s AND status='aktif'"
+        params = [int(kelas_id)]
+        if q:
+            where += " AND (nama LIKE %s OR nisn LIKE %s OR nis LIKE %s)"
+            like = f"%{q}%"
+            params.extend([like, like, like])
+        order = f"nisn {arah}, nama" if urut == "nisn" else f"nama {arah}"
+        siswa = query(
+            f"SELECT id, nis, nisn, nama, jenis_kelamin FROM siswa WHERE {where} ORDER BY {order}",
+            params,
+        )
+    sekolah = query(
+        "SELECT tempat_rapor, tanggal_rapor, kepala_sekolah, nip_kepala FROM sekolah ORDER BY id LIMIT 1",
+        one=True,
+    ) or {}
+    return render_template(
+        "menu/cetak_rapor.html",
+        kelas=kelas,
+        kelas_id=str(kelas_id),
+        siswa=siswa,
+        q=q,
+        urut=urut,
+        arah=arah.lower(),
+        sekolah=sekolah,
+        nav="cetak",
+    )
+
+
+@bp.route("/admin/cetak-rapor/tanggal", methods=["POST"])
+@login_required
+def atur_tanggal_rapor():
+    tempat = (request.form.get("tempat_rapor") or "").strip()
+    tanggal = (request.form.get("tanggal_rapor") or "").strip()
+    kepala = (request.form.get("kepala_sekolah") or "").strip()
+    nbm = (request.form.get("nip_kepala") or "").strip()
+    kelas_id = request.form.get("kelas_id") or ""
+    if not tempat or not tanggal or not kepala or not nbm:
+        flash("Tempat, tanggal, nama kepala sekolah, dan NBM wajib diisi.", "error")
+        return redirect(url_for("menu.cetak_rapor", kelas_id=kelas_id))
+    try:
+        datetime.strptime(tanggal, "%Y-%m-%d")
+    except ValueError:
+        flash("Tanggal pembagian rapor tidak valid.", "error")
+        return redirect(url_for("menu.cetak_rapor", kelas_id=kelas_id))
+    sekolah = query("SELECT id FROM sekolah ORDER BY id LIMIT 1", one=True)
+    if not sekolah:
+        flash("Data sekolah belum ada.", "error")
+        return redirect(url_for("menu.cetak_rapor", kelas_id=kelas_id))
+    execute(
+        """UPDATE sekolah
+           SET tempat_rapor=%s, tanggal_rapor=%s, kepala_sekolah=%s, nip_kepala=%s
+           WHERE id=%s""",
+        (tempat, tanggal, kepala, nbm, sekolah["id"]),
+    )
+    flash("Pengaturan tanggal rapor disimpan.", "success")
+    return redirect(url_for("menu.cetak_rapor", kelas_id=kelas_id))
+
+
+def _kirim_pdf(daftar, nama):
+    berkas = buat_pdf(daftar)
+    return send_file(berkas, mimetype="application/pdf", as_attachment=False, download_name=nama)
+
+
+@bp.route("/admin/cetak-rapor/pdf")
+@login_required
+def cetak_rapor_pdf():
+    kelas_id = request.args.get("kelas_id") or ""
+    if not str(kelas_id).isdigit() or not _boleh_cetak_kelas(int(kelas_id)):
+        flash("Pilih kelas bimbingan yang menjadi tugas Anda.", "error")
+        return redirect(url_for("menu.cetak_rapor"))
     siswa = query(
-        "SELECT id, nis, nisn, nama, jenis_kelamin FROM siswa WHERE kelas_id=%s AND status='aktif' ORDER BY nama",
-        (kelas_id,),
-    ) if kelas_id else []
-    return render_template("menu/cetak_rapor.html", kelas=kelas, kelas_id=str(kelas_id), siswa=siswa, nav="cetak")
+        "SELECT id FROM siswa WHERE kelas_id=%s AND status='aktif' ORDER BY nama",
+        (int(kelas_id),),
+    )
+    daftar = [paket for item in siswa if (paket := _paket_rapor(item["id"]))]
+    kelas = query("SELECT nama FROM kelas WHERE id=%s", (int(kelas_id),), one=True) or {}
+    nama = f"Laporan Hasil Belajar - Kelas {kelas.get('nama') or kelas_id}.pdf"
+    return _kirim_pdf(daftar, nama)
 
 
 @bp.route("/admin/cetak-rapor/<int:siswa_id>")
 @login_required
 def rapor_siswa(siswa_id):
-    siswa = query(
-        """SELECT s.*, k.nama AS kelas_nama, g.nama AS wali, g.gelar_belakang
-           FROM siswa s LEFT JOIN kelas k ON k.id=s.kelas_id
-           LEFT JOIN guru g ON g.id=k.wali_kelas_id WHERE s.id=%s""",
-        (siswa_id,),
-        one=True,
-    )
-    if not siswa:
+    siswa = query("SELECT kelas_id FROM siswa WHERE id=%s", (siswa_id,), one=True)
+    if not siswa or not siswa["kelas_id"] or not _boleh_cetak_kelas(siswa["kelas_id"]):
+        flash("Anda hanya dapat mencetak rapor kelas binaannya.", "error")
+        return redirect(url_for("menu.cetak_rapor"))
+    paket = _paket_rapor(siswa_id)
+    if not paket:
         flash("Siswa tidak ditemukan.", "error")
         return redirect(url_for("menu.cetak_rapor"))
-    if not _is_admin():
-        milik = query(
-            "SELECT id FROM kelas WHERE id=%s AND wali_kelas_id=%s",
-            (siswa["kelas_id"], _guru_id() or 0),
-            one=True,
-        )
-        if not milik:
-            flash("Anda hanya dapat mencetak rapor kelas binaannya.", "error")
-            return redirect(url_for("menu.cetak_rapor"))
-    mapel = query(
-        """SELECT m.nama, p.kkm, ns.nilai
-           FROM pelajaran pel
-           JOIN mata_pelajaran m ON m.id=pel.mapel_id
-           LEFT JOIN perencanaan_penilaian p ON p.pelajaran_id=pel.id
-           LEFT JOIN nilai_sumatif ns ON ns.pelajaran_id=pel.id AND ns.siswa_id=%s
-           WHERE pel.kelas_id=%s ORDER BY m.nama""",
-        (siswa_id, siswa["kelas_id"]),
-    )
-    ekskul = query(
-        """SELECT e.nama, n.nilai FROM nilai_ekskul n
-           JOIN ekstrakurikuler e ON e.id=n.ekskul_id WHERE n.siswa_id=%s""",
-        (siswa_id,),
-    )
-    sekolah = query("SELECT * FROM sekolah LIMIT 1", one=True) or {}
-    ta = query("SELECT * FROM tahun_ajaran WHERE aktif=1 LIMIT 1", one=True)
-    return render_template("menu/rapor_siswa.html", siswa=siswa, mapel=mapel, ekskul=ekskul, sekolah=sekolah, ta=ta)
+    return _kirim_pdf([paket], f"Laporan Hasil Belajar - {paket['siswa']}.pdf")
 
 
 @bp.route("/admin/dapodik")
@@ -1263,26 +1567,141 @@ def hapus_predikat(item_id):
     return redirect(url_for("menu.predikat"))
 
 
+def _kelas_tahfiz():
+    urut = """ORDER BY FIELD(tingkat,'7','8','9'),
+                     CAST(SUBSTRING_INDEX(nama,'-',-1) AS UNSIGNED), nama"""
+    if _is_admin():
+        return query(f"SELECT id, nama FROM kelas {urut}")
+    gid = _guru_id() or 0
+    return query(
+        f"""SELECT DISTINCT k.id, k.nama FROM kelas k
+            LEFT JOIN mapping_guru_tahfiz m ON m.kelas_id=k.id AND m.guru_id=%s
+            WHERE k.wali_kelas_id=%s OR m.id IS NOT NULL
+            ORDER BY FIELD(k.tingkat,'7','8','9'),
+                     CAST(SUBSTRING_INDEX(k.nama,'-',-1) AS UNSIGNED), k.nama""",
+        (gid, gid),
+    )
+
+
+def _boleh_tahfiz(kelas_id):
+    return str(kelas_id) in {str(item["id"]) for item in _kelas_tahfiz()}
+
+
+def _paket_tahfiz(siswa_id):
+    siswa = query(
+        """SELECT s.id, s.nama, s.nis, s.nisn, s.kelas_id, k.nama AS kelas_nama, k.tingkat
+           FROM siswa s LEFT JOIN kelas k ON k.id=s.kelas_id WHERE s.id=%s""",
+        (siswa_id,),
+        one=True,
+    )
+    if not siswa:
+        return None
+    ta = query("SELECT * FROM tahun_ajaran WHERE aktif=1 LIMIT 1", one=True) or {}
+    sekolah = query("SELECT * FROM sekolah ORDER BY id LIMIT 1", one=True) or {}
+    aspek = query("SELECT id, nama FROM aspek_tahfiz WHERE aktif=1 ORDER BY urutan, id")
+    nilai = {}
+    if ta.get("id"):
+        for baris in query(
+            "SELECT aspek_id, nilai, predikat, deskripsi FROM nilai_tahfiz WHERE siswa_id=%s AND tahun_ajaran_id=%s",
+            (siswa_id, ta["id"]),
+        ):
+            nilai[baris["aspek_id"]] = baris
+    mapel = []
+    for item in aspek:
+        isi = nilai.get(item["id"]) or {}
+        deskripsi = (isi.get("deskripsi") or "").strip() or (isi.get("predikat") or "").strip()
+        mapel.append({"nama": item["nama"], "nilai": isi.get("nilai"), "deskripsi": deskripsi or "-"})
+    return {
+        "sekolah": sekolah.get("nama") or "SMP Muhammadiyah 22 Setiabudi Pamulang",
+        "alamat": _alamat_sekolah(sekolah),
+        "siswa": siswa["nama"],
+        "nisn": f"{siswa['nis'] or '-'} / {siswa['nisn'] or '-'}",
+        "kelas": siswa["kelas_nama"] or "-",
+        "fase": "D" if str(siswa["tingkat"]) in ("7", "8", "9") else "-",
+        "semester": ta.get("semester") or "-",
+        "tahun": ta.get("tahun") or "-",
+        "mapel": mapel,
+        "kelas_nama": siswa["kelas_nama"] or "kelas",
+        "kelas_id": siswa["kelas_id"],
+    }
+
+
 @bp.route("/admin/cetak-tahfiz")
 @login_required
 def cetak_tahfiz():
-    kelas = _kelas_scope() if not _is_admin() else query("SELECT id, nama FROM kelas ORDER BY nama")
+    kelas = _kelas_tahfiz()
     boleh = {str(item["id"]) for item in kelas}
     kelas_id = request.args.get("kelas_id") or ""
-    if str(kelas_id) not in boleh:
-        kelas_id = ""
+    if kelas_id not in boleh:
+        kelas_id = str(kelas[0]["id"]) if kelas else ""
+    q = (request.args.get("q") or "").strip()
+    ta = query("SELECT id FROM tahun_ajaran WHERE aktif=1 LIMIT 1", one=True)
+    ta_id = ta["id"] if ta else 0
     siswa = []
     if kelas_id:
+        where = "s.kelas_id=%s AND s.status='aktif'"
+        params = [ta_id, int(kelas_id)]
+        if q:
+            where += " AND (s.nama LIKE %s OR s.nisn LIKE %s OR s.nis LIKE %s)"
+            like = f"%{q}%"
+            params.extend([like, like, like])
         siswa = query(
-            """SELECT s.id, s.nama, s.nis, a.nama AS aspek, n.nilai, n.predikat
+            f"""SELECT s.id, s.nama, s.nis, s.nisn,
+                      (SELECT COUNT(*) FROM aspek_tahfiz WHERE aktif=1) AS aspek_n,
+                      (SELECT COUNT(*) FROM nilai_tahfiz n
+                         JOIN aspek_tahfiz a ON a.id=n.aspek_id AND a.aktif=1
+                         WHERE n.siswa_id=s.id AND n.tahun_ajaran_id=%s AND n.nilai IS NOT NULL) AS isi_n
                FROM siswa s
-               LEFT JOIN nilai_tahfiz n ON n.siswa_id=s.id
-               LEFT JOIN aspek_tahfiz a ON a.id=n.aspek_id
-               WHERE s.kelas_id=%s AND s.status='aktif'
-               ORDER BY s.nama, a.nama""",
-            (kelas_id,),
+               WHERE {where}
+               ORDER BY s.nama""",
+            params,
         )
-    return render_template("menu/cetak_tahfiz.html", kelas=kelas, kelas_id=str(kelas_id), siswa=siswa, nav="cetaktahfiz")
+    return render_template(
+        "menu/cetak_tahfiz.html",
+        kelas=kelas,
+        kelas_id=str(kelas_id),
+        siswa=siswa,
+        q=q,
+        nav="cetaktahfiz",
+    )
+
+
+@bp.route("/admin/cetak-tahfiz/pdf")
+@login_required
+def cetak_tahfiz_pdf():
+    kelas_id = request.args.get("kelas_id") or ""
+    if not str(kelas_id).isdigit() or not _boleh_tahfiz(int(kelas_id)):
+        flash("Pilih kelas tahfiz yang menjadi tugas Anda.", "error")
+        return redirect(url_for("menu.cetak_tahfiz"))
+    siswa = query(
+        "SELECT id FROM siswa WHERE kelas_id=%s AND status='aktif' ORDER BY nama",
+        (int(kelas_id),),
+    )
+    daftar = [paket for item in siswa if (paket := _paket_tahfiz(item["id"]))]
+    kelas = query("SELECT nama FROM kelas WHERE id=%s", (int(kelas_id),), one=True) or {}
+    berkas = buat_pdf_tahfiz(daftar)
+    return send_file(
+        berkas,
+        mimetype="application/pdf",
+        as_attachment=False,
+        download_name=f"Rapor Tahfiz Kelas {kelas.get('nama') or kelas_id}.pdf",
+    )
+
+
+@bp.route("/admin/cetak-tahfiz/siswa/<int:siswa_id>")
+@login_required
+def cetak_tahfiz_siswa(siswa_id):
+    paket = _paket_tahfiz(siswa_id)
+    if not paket or not paket["kelas_id"] or not _boleh_tahfiz(paket["kelas_id"]):
+        flash("Anda hanya dapat mencetak rapor tahfiz kelas tugas Anda.", "error")
+        return redirect(url_for("menu.cetak_tahfiz"))
+    berkas = buat_pdf_tahfiz([paket])
+    return send_file(
+        berkas,
+        mimetype="application/pdf",
+        as_attachment=False,
+        download_name=f"Rapor Tahfiz - {paket['siswa']}.pdf",
+    )
 
 
 def _pelajaran_tugas():

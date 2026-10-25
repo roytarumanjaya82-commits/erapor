@@ -178,24 +178,28 @@ def main():
         kel_ids[kode] = cur.lastrowid
 
     mapel_def = [
-        ("PAI", "Pendidikan Agama Islam", "A", 75),
+        ("PAI", "Al Islam", "A", 75),
         ("PPKN", "Pendidikan Pancasila", "A", 75),
         ("BIN", "Bahasa Indonesia", "A", 75),
         ("MTK", "Matematika", "A", 75),
-        ("SEJ", "Sejarah", "A", 75),
+        ("IPA", "IPA Terpadu", "A", 75),
+        ("IPS", "IPS Terpadu", "A", 75),
         ("BIG", "Bahasa Inggris", "A", 75),
-        ("PJOK", "Pendidikan Jasmani", "B", 75),
+        ("PJOK", "PJOK", "B", 75),
         ("SBD", "Seni Budaya", "B", 75),
-        ("PKWU", "Prakarya dan Kewirausahaan", "B", 75),
         ("INF", "Informatika", "B", 75),
-        ("FIS", "Fisika", "C", 75),
-        ("KIM", "Kimia", "C", 75),
-        ("BIO", "Biologi", "C", 75),
-        ("GEO", "Geografi", "C", 75),
-        ("EKO", "Ekonomi", "C", 75),
-        ("SOS", "Sosiologi", "C", 75),
-        ("BAR", "Bahasa Arab", "M", 75),
+        ("TS", "Tapak Suci", "B", 75),
+        ("BAR", "Bahasa Arab", "Muatan Lokal", 75),
+        ("KMM", "Kemuhammadiyahan", "Muatan Lokal", 75),
+        ("THF", "Tahfidz", "Muatan Lokal", 75),
+        ("KOD", "Koding", "B", 75),
+        ("DGR", "Desain Grafis", "B", 75),
+        ("BRC", "Broadcasting", "B", 75),
     ]
+    rapor_kode = {
+        "PAI", "PPKN", "BIN", "MTK", "IPA", "IPS", "BIG",
+        "PJOK", "SBD", "INF", "TS", "BAR", "KMM", "THF",
+    }
     mapel_ids = []
     for kode, nama, kel, kkm in mapel_def:
         cur.execute(
@@ -260,17 +264,15 @@ def main():
             (nama, guru_ids[i % len(guru_ids)]),
         )
 
-    for i, mid in enumerate(mapel_ids, start=1):
+    for kode, _nama, _kel, _kkm in mapel_def:
+        if kode not in rapor_kode:
+            continue
+        mid = mapel_ids[[m[0] for m in mapel_def].index(kode)]
+        urutan = [m[0] for m in mapel_def].index(kode) + 1
         cur.execute(
             "INSERT INTO mapping_rapor (mapel_id, tampil_rapor, urutan) VALUES (%s,1,%s)",
-            (mid, i),
+            (mid, urutan),
         )
-
-    cur.execute("INSERT INTO gabung_mapel (nama_gabungan) VALUES (%s)", ("Ilmu Pengetahuan Alam",))
-    gid = cur.lastrowid
-    for kode in ("FIS", "KIM", "BIO"):
-        mid = mapel_ids[[m[0] for m in mapel_def].index(kode)]
-        cur.execute("INSERT INTO gabung_mapel_item (gabung_id, mapel_id) VALUES (%s,%s)", (gid, mid))
 
     cur.execute(
         "INSERT INTO tryout (nama, tanggal, tingkat) VALUES (%s,%s,'9')",

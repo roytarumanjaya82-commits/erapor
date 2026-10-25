@@ -9,6 +9,7 @@
 <div class="toolbar">
   <form method="get"><input class="search" name="q" value="{{ q }}" placeholder="Cari nama, NUPTK, atau NBM / NIP"></form>
   <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+    <a class="btn btn-green" href="{{ url_for('main.form_excel_guru') }}">Form Excel</a>
     <form method="post" action="{{ url_for('main.upload_guru') }}" enctype="multipart/form-data" style="display:flex;gap:8px;align-items:center" onsubmit="return confirm('Daftar guru akan diganti sesuai file Excel. Guru lama yang tidak ada di file akan dihapus. Lanjutkan?')">
       <input class="search" type="file" name="berkas" accept=".xls,.xlsx" required>
       <button class="btn btn-primary" type="submit">Upload data guru</button>

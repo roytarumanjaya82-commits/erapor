@@ -57,6 +57,11 @@ ENDPOINT_TUGAS = {
     "main.form_mapel": {"admin"},
     "main.hapus_mapel": {"admin"},
     "main.hapus_mapel_terpilih": {"admin"},
+    "main.data_guru": {"admin"},
+    "main.form_guru": {"admin"},
+    "main.form_excel_guru": {"admin"},
+    "main.upload_guru": {"admin"},
+    "main.hapus_guru": {"admin"},
     "main.data_sekolah": {"admin"},
     "main.form_sekolah": {"admin"},
     "main.hapus_sekolah": {"admin"},
@@ -426,7 +431,7 @@ def guard_request():
     from flask import request
 
     endpoint = request.endpoint or ""
-    if endpoint in {"auth.login", "auth.logout", "main.publik", "static"} or endpoint.startswith("static"):
+    if endpoint in {"auth.login", "auth.logout", "main.publik", "menu.publik", "static"} or endpoint.startswith("static"):
         return None
     if not session.get("user_id"):
         return None

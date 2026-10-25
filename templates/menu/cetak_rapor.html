@@ -1,27 +1,87 @@
 {% extends "base.html" %}
 {% block title %}Cetak Rapor Sumatif{% endblock %}
+{% block content_class %}content-wide{% endblock %}
 {% block content %}
-<h1 class="page-title">Cetak Rapor Sumatif</h1>
-<form method="get" class="toolbar">
-  <label>Pilih kelas bimbingan</label>
-  <select name="kelas_id" class="search" onchange="this.form.submit()">
+{% set admin = 'admin' in tugas %}
+<div class="page-head">
+  <h1 class="page-title">Cetak Rapor Sumatif</h1>
+  <div class="seg">
+    {% if admin %}
+    <button class="btn btn-amber" type="button" onclick="document.getElementById('modal-tanggal').classList.add('open')">Atur Tanggal Rapor</button>
+    {% endif %}
+    {% if kelas_id %}
+    <a class="btn btn-green" href="{{ url_for('menu.cetak_rapor_pdf', kelas_id=kelas_id) }}" target="_blank">Cetak Semua Siswa (PDF)</a>
+    {% endif %}
+  </div>
+</div>
+<form method="get" class="pilih-kelas">
+  <label>Pilih Kelas Bimbingan</label>
+  <select name="kelas_id" onchange="this.form.submit()">
     <option value="">Pilih kelas</option>
-    {% for k in kelas %}<option value="{{ k.id }}" {% if kelas_id==k.id|string %}selected{% endif %}>{{ k.nama }}</option>{% endfor %}
+    {% for k in kelas %}
+    <option value="{{ k.id }}" {% if kelas_id==k.id|string %}selected{% endif %}>{{ k.nama }}</option>
+    {% endfor %}
   </select>
 </form>
-<div class="card" style="padding:8px 16px 16px">
+<div class="card" style="padding:8px 16px 16px;overflow:auto">
+  <div class="toolbar">
+    <span></span>
+    <form method="get">
+      <input type="hidden" name="kelas_id" value="{{ kelas_id }}">
+      <input type="hidden" name="urut" value="{{ urut }}">
+      <input type="hidden" name="arah" value="{{ arah }}">
+      <input class="search" name="q" value="{{ q }}" placeholder="Cari">
+    </form>
+  </div>
   <table class="data">
-    <thead><tr><th>Nama siswa</th><th>NISN</th><th>L/P</th><th></th></tr></thead>
+    <thead>
+      <tr>
+        <th><a class="sort" href="{{ url_for('menu.cetak_rapor', kelas_id=kelas_id, q=q, urut='nama', arah='desc' if urut=='nama' and arah=='asc' else 'asc') }}">Nama Siswa</a></th>
+        <th><a class="sort" href="{{ url_for('menu.cetak_rapor', kelas_id=kelas_id, q=q, urut='nisn', arah='desc' if urut=='nisn' and arah=='asc' else 'asc') }}">NISN</a></th>
+        <th>L/P</th>
+        <th></th>
+      </tr>
+    </thead>
     <tbody>
     {% for s in siswa %}
       <tr>
-        <td>{{ s.nama }}</td><td>{{ s.nisn or '-' }}</td><td>{{ 'Laki-laki' if s.jenis_kelamin=='L' else 'Perempuan' }}</td>
-        <td><a class="btn btn-primary btn-sm" href="{{ url_for('menu.rapor_siswa', siswa_id=s.id) }}" target="_blank">Cetak Rapor</a></td>
+        <td class="nama-tebal">{{ s.nama }}</td>
+        <td>{{ s.nisn or '-' }}</td>
+        <td>
+          {% if s.jenis_kelamin=='L' %}<span class="jk laki">Laki-laki</span>
+          {% elif s.jenis_kelamin=='P' %}<span class="jk perempuan">Perempuan</span>
+          {% else %}-{% endif %}
+        </td>
+        <td><a class="tautan-hijau" href="{{ url_for('menu.rapor_siswa', siswa_id=s.id) }}" target="_blank">Cetak Rapor</a></td>
       </tr>
     {% else %}
-      <tr><td colspan="4">Pilih kelas terlebih dahulu.</td></tr>
+      <tr><td colspan="4" class="empty-state"><div class="empty-x">×</div>{% if kelas_id %}Tidak ada data yang ditemukan{% else %}Pilih kelas bimbingan{% endif %}</td></tr>
     {% endfor %}
     </tbody>
   </table>
 </div>
+{% if admin %}
+<div class="modal-back" id="modal-tanggal" onclick="if (event.target === this) this.classList.remove('open')">
+  <div class="modal modal-lebar" role="dialog" aria-modal="true" aria-labelledby="judul-tanggal">
+    <button class="modal-x" type="button" onclick="document.getElementById('modal-tanggal').classList.remove('open')" aria-label="Tutup">×</button>
+    <h3 id="judul-tanggal">Pengaturan Tanggal &amp; Tempat Cetak Rapor</h3>
+    <p>Ubah tempat, tanggal cetak rapor, dan data kepala sekolah.</p>
+    <form method="post" action="{{ url_for('menu.atur_tanggal_rapor') }}">
+      <input type="hidden" name="kelas_id" value="{{ kelas_id }}">
+      <label>Tempat / Kota Penerbitan Rapor<span class="wajib">*</span></label>
+      <input type="text" name="tempat_rapor" value="{{ sekolah.tempat_rapor or '' }}" required>
+      <label>Tanggal Pembagian / Cetak Rapor<span class="wajib">*</span></label>
+      <input type="date" name="tanggal_rapor" value="{{ sekolah.tanggal_rapor|iso }}" required>
+      <label>Nama Kepala Sekolah (Lengkap dengan Gelar)<span class="wajib">*</span></label>
+      <input type="text" name="kepala_sekolah" value="{{ sekolah.kepala_sekolah or '' }}" required>
+      <label>NBM / NIP Kepala Sekolah<span class="wajib">*</span></label>
+      <input type="text" name="nip_kepala" value="{{ sekolah.nip_kepala or '' }}" required>
+      <div class="form-actions">
+        <button class="btn btn-amber" type="submit">Kirim</button>
+        <button class="btn btn-ghost" type="button" onclick="document.getElementById('modal-tanggal').classList.remove('open')">Batal</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endif %}
 {% endblock %}

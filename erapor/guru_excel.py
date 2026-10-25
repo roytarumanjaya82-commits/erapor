@@ -2,7 +2,9 @@ import io
 import re
 
 import xlrd
-from openpyxl import load_workbook
+from openpyxl import Workbook, load_workbook
+from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
+from openpyxl.utils import get_column_letter
 
 from .db import execute, query, transaction
 
@@ -104,6 +106,8 @@ def parse_guru_rows(sheets):
                 return ""
             return row[index]
 
+        if any(_text(cell).upper() == "CONTOH" for cell in row):
+            continue
         nama = _text(pick(nama_col))
         mapel = _text(pick(mapel_col))
         kelas = _text(pick(kelas_col))
@@ -146,6 +150,66 @@ def parse_guru_rows(sheets):
     if not hasil:
         raise ValueError("Tidak ada nama guru yang terbaca dari file.")
     return hasil
+
+
+def formulir_guru():
+    """Form kosong yang bisa diunggah lewat tombol Upload data guru."""
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Form Guru"
+    judul = [
+        "No",
+        "NAMA GURU",
+        "MATA PELAJARAN",
+        "JUMLAH JAM",
+        "MENGAJAR DI KELAS",
+    ]
+    contoh = [
+        ["contoh", "Nama Lengkap, S.Pd.", "Bahasa Indonesia", 24, "7.1 - 7.3"],
+        ["contoh", None, "Matematika", 12, "8.1"],
+    ]
+    ws.append(judul)
+    for baris in contoh:
+        ws.append(baris)
+    isi = PatternFill("solid", fgColor="0F766E")
+    kuning = PatternFill("solid", fgColor="FEF3C7")
+    garis = Border(
+        left=Side(style="thin", color="CBD5E1"),
+        right=Side(style="thin", color="CBD5E1"),
+        top=Side(style="thin", color="CBD5E1"),
+        bottom=Side(style="thin", color="CBD5E1"),
+    )
+    for sel in ws[1]:
+        sel.fill = isi
+        sel.font = Font(bold=True, color="FFFFFF")
+        sel.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    for nomor in range(1, 41):
+        ws.append([nomor, None, None, None, None])
+    for baris in ws.iter_rows(min_row=1, max_row=ws.max_row, max_col=len(judul)):
+        for sel in baris:
+            sel.border = garis
+            if sel.row == 1:
+                continue
+            sel.alignment = Alignment(vertical="center")
+            if sel.row <= 1 + len(contoh):
+                sel.fill = kuning
+                sel.font = Font(italic=True, color="92400E")
+    lebar = (12, 36, 28, 14, 36)
+    for indeks, ukuran in enumerate(lebar, start=1):
+        ws.column_dimensions[get_column_letter(indeks)].width = ukuran
+    ws.auto_filter.ref = f"A1:E{ws.max_row}"
+    ws.freeze_panes = "A4"
+    ws.page_setup.orientation = "landscape"
+    ws.page_setup.fitToPage = True
+    ws.page_setup.fitToWidth = 1
+    ws.page_setup.fitToHeight = 1
+    ws.sheet_properties.pageSetUpPr.fitToPage = True
+    ws.oddHeader.left.text = "Form Data Guru"
+    ws.oddFooter.center.text = "SMP Muhammadiyah 22 Setiabudi Pamulang"
+    keluar = io.BytesIO()
+    wb.save(keluar)
+    keluar.seek(0)
+    return keluar
 
 
 def parse_guru_file(filename, data):

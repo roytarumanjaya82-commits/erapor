@@ -1,16 +1,202 @@
-{% extends "base.html" %}
-{% block title %}Dashboard Publik{% endblock %}
-{% block content %}
-<h1 class="page-title">Dashboard Publik</h1>
-<div class="card">
-  <div class="kicker">MONITORING PUBLIK PROGRES NILAI</div>
-  <h2>Progress Pengisian Nilai Rapor</h2>
-  <p class="sub">Ringkasan capaian sekolah pada tahun ajaran berjalan.</p>
-  <div class="stats">
-    <div class="stat"><div><div class="lbl">CAPAIAN</div><div class="val">{{ stats.pct }}%</div></div></div>
-    <div class="stat"><div><div class="lbl">MAPEL LENGKAP</div><div class="val">{{ stats.lengkap }}/{{ stats.pelajaran }}</div></div></div>
-    <div class="stat"><div><div class="lbl">GURU</div><div class="val">{{ stats.guru }}</div></div></div>
-    <div class="stat"><div><div class="lbl">SISWA</div><div class="val">{{ stats.siswa }}</div></div></div>
-  </div>
-</div>
-{% endblock %}
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Monitoring Publik Progres Nilai</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+</head>
+<body class="halaman-publik">
+  <header class="pub-top">
+    <div class="pub-brand">
+      <span class="pub-mark">M</span>
+      <div>
+        <strong>{{ data.sekolah }}</strong>
+        <span>Monitoring Publik Progres Nilai e-Rapor</span>
+      </div>
+    </div>
+    <div class="pub-tools">
+      <span class="live" id="live-status"><i></i> Live update: <b id="detik">20</b>s</span>
+      <button class="btn btn-ghost" id="segarkan" type="button">Segarkan Data</button>
+      <a class="btn btn-green" href="{{ url_for('main.dashboard') if current_user else url_for('auth.login') }}">Login e-Rapor</a>
+    </div>
+  </header>
+  <main class="pub-wrap">
+    <section class="hero">
+      <div>
+        <span class="hero-pill">Tahun Ajaran {{ data.tahun }} Semester {{ data.semester }}</span>
+        <h1>Progress Pengisian Nilai Rapor</h1>
+        <p>Halaman ini otomatis melakukan pembaruan data secara live di latar belakang (tanpa reload). Pantau kelengkapan nilai secara transparan dan real-time.</p>
+      </div>
+      <div class="hero-side">
+        <div class="ring" style="--nilai: {{ data.pct }}">
+          <svg viewBox="0 0 120 120" aria-hidden="true">
+            <circle cx="60" cy="60" r="52"></circle>
+            <circle class="nilai" cx="60" cy="60" r="52"></circle>
+          </svg>
+          <strong>{{ data.pct }}%</strong>
+        </div>
+        <div>
+          <div class="hero-kicker">Capaian Sekolah</div>
+          <div class="hero-angka">{{ data.lengkap }} / {{ data.pelajaran }}</div>
+          <div class="hero-sub">Mapel Tuntas (100%)</div>
+        </div>
+      </div>
+      <div class="hero-foot">
+        <span>Terakhir diperbarui: {{ diperbarui }}</span>
+        <span>Total Guru: <b>{{ data.guru_total }}</b></span>
+        <span>Total Kelas: <b>{{ data.kelas_total }}</b></span>
+        <span>Total Siswa: <b>{{ data.siswa }}</b></span>
+      </div>
+    </section>
+    <section class="pub-stats">
+      <article class="pub-stat hijau">
+        <div class="pub-ikon">✓</div>
+        <div>
+          <div class="lbl">LENGKAP (100%)</div>
+          <strong>{{ data.lengkap }}</strong>
+          <span>{{ data.pct }}% dari total mapel</span>
+        </div>
+      </article>
+      <article class="pub-stat oranye">
+        <div class="pub-ikon">◷</div>
+        <div>
+          <div class="lbl">SEDANG PROSES</div>
+          <strong>{{ data.proses }}</strong>
+          <span>{{ (data.proses * 100 / data.pelajaran)|round(1) if data.pelajaran else 0 }}% sedang diisi</span>
+        </div>
+      </article>
+      <article class="pub-stat merah">
+        <div class="pub-ikon">!</div>
+        <div>
+          <div class="lbl">BELUM MENGISI</div>
+          <strong>{{ data.belum }}</strong>
+          <span>Termasuk {{ data.belum_rencana }} belum ada rencana</span>
+        </div>
+      </article>
+      <article class="pub-stat biru">
+        <div class="pub-ikon">▤</div>
+        <div>
+          <div class="lbl">RAPOR TAHFIZ</div>
+          <strong>{{ data.tahfiz_pct }}%</strong>
+          <span>{{ data.tahfiz_terisi }} / {{ data.tahfiz_harapan }} nilai terisi</span>
+        </div>
+      </article>
+    </section>
+    <nav class="pub-tab">
+      <a class="{% if tab=='guru' %}on{% endif %}" href="{{ url_for('menu.publik', tab='guru') }}">Progres per Guru ({{ data.guru_total }})</a>
+      <a class="{% if tab=='kelas' %}on{% endif %}" href="{{ url_for('menu.publik', tab='kelas') }}">Progres per Kelas ({{ data.kelas_total }})</a>
+      <a class="{% if tab=='tahfiz' %}on{% endif %}" href="{{ url_for('menu.publik', tab='tahfiz') }}">Program Tahfiz ({{ data.program|length }})</a>
+    </nav>
+    <section class="pub-panel">
+      {% if tab != 'tahfiz' %}
+      <form class="pub-filter" method="get">
+        <input type="hidden" name="tab" value="{{ tab }}">
+        {% if tab=='guru' %}<input type="hidden" name="status" value="{{ status }}">{% endif %}
+        <input class="search" name="q" value="{{ q }}" placeholder="{% if tab=='guru' %}Cari nama guru pengampu / NUPTK...{% else %}Cari kelas atau wali...{% endif %}">
+        {% if tab=='guru' %}
+        <div class="status-filter">
+          <span>Status:</span>
+          <a class="{% if status=='semua' %}on{% endif %}" href="{{ url_for('menu.publik', tab='guru', q=q, status='semua') }}">Semua</a>
+          <a class="tuntas {% if status=='tuntas' %}on{% endif %}" href="{{ url_for('menu.publik', tab='guru', q=q, status='tuntas') }}">100% Tuntas</a>
+          <a class="proses {% if status=='proses' %}on{% endif %}" href="{{ url_for('menu.publik', tab='guru', q=q, status='proses') }}">Sedang Proses</a>
+          <a class="belum {% if status=='belum' %}on{% endif %}" href="{{ url_for('menu.publik', tab='guru', q=q, status='belum') }}">Belum Selesai</a>
+        </div>
+        {% endif %}
+      </form>
+      {% endif %}
+      {% if tab=='guru' %}
+        {% for item in guru %}
+        <details class="kartu-orang">
+          <summary>
+            <span class="nomor {% if item.status=='tuntas' %}jadi{% endif %}">{{ loop.index }}</span>
+            <span class="identitas">
+              <b>{{ item.nama }}</b>
+              <span class="lencana {{ item.status }}">{% if item.status=='tuntas' %}Tuntas 100%{% elif item.status=='proses' %}Sedang Proses{% else %}Belum Selesai{% endif %}</span>
+              <small>NUPTK/NIP: {{ item.nomor }} • {{ item.total }} Rombel/Mapel diampu</small>
+            </span>
+            <span class="batang">
+              <span>Progres: <b>{{ item.pct }}%</b></span>
+              <i><em style="width: {{ item.pct }}%"></em></i>
+              <small>{{ item.lengkap }} Lengkap • {{ item.proses }} Proses • {{ item.belum }} Belum</small>
+            </span>
+          </summary>
+          <ul>
+            {% for mapel in item.mapel %}
+            <li>{{ mapel.mapel_nama }} • {{ mapel.kelas_nama }} <span class="lencana {{ mapel.keadaan }}">{{ 'Lengkap' if mapel.keadaan=='lengkap' else 'Proses' if mapel.keadaan=='proses' else 'Belum' }}</span></li>
+            {% else %}
+            <li>Belum ada mata pelajaran yang diampu.</li>
+            {% endfor %}
+          </ul>
+        </details>
+        {% else %}
+        <p class="kosong-pub">Tidak ada guru yang cocok dengan pencarian.</p>
+        {% endfor %}
+      {% elif tab=='kelas' %}
+        {% for item in kelas %}
+        <details class="kartu-orang">
+          <summary>
+            <span class="nomor {% if item.status=='tuntas' %}jadi{% endif %}">{{ loop.index }}</span>
+            <span class="identitas">
+              <b>{{ item.nama }}</b>
+              <span class="lencana {{ item.status }}">{% if item.status=='tuntas' %}Tuntas 100%{% elif item.status=='proses' %}Sedang Proses{% else %}Belum Selesai{% endif %}</span>
+              <small>Wali: {{ item.wali }} • {{ item.total }} mapel</small>
+            </span>
+            <span class="batang">
+              <span>Progres: <b>{{ item.pct }}%</b></span>
+              <i><em style="width: {{ item.pct }}%"></em></i>
+              <small>{{ item.lengkap }} Lengkap • {{ item.proses }} Proses • {{ item.belum }} Belum</small>
+            </span>
+          </summary>
+          <ul>
+            {% for mapel in item.mapel %}
+            <li>{{ mapel.mapel_nama }} <span class="lencana {{ mapel.keadaan }}">{{ 'Lengkap' if mapel.keadaan=='lengkap' else 'Proses' if mapel.keadaan=='proses' else 'Belum' }}</span></li>
+            {% else %}
+            <li>Belum ada pembelajaran pada kelas ini.</li>
+            {% endfor %}
+          </ul>
+        </details>
+        {% else %}
+        <p class="kosong-pub">Tidak ada kelas yang cocok dengan pencarian.</p>
+        {% endfor %}
+      {% else %}
+        {% for item in data.program %}
+        <article class="kartu-orang">
+          <div class="identitas">
+            <b>{{ item.nama }}</b>
+            <small>{{ item.terisi }} / {{ item.harapan }} nilai terisi</small>
+          </div>
+          <span class="batang">
+            <span>Progres: <b>{{ item.pct }}%</b></span>
+            <i><em style="width: {{ item.pct }}%"></em></i>
+          </span>
+        </article>
+        {% else %}
+        <p class="kosong-pub">Belum ada aspek tahfiz.</p>
+        {% endfor %}
+      {% endif %}
+    </section>
+  </main>
+  <script>
+  var detik = 20;
+  var label = document.getElementById("detik");
+  var status = document.getElementById("live-status");
+  setInterval(function () {
+    detik -= 1;
+    if (detik <= 0) {
+      status.innerHTML = "Memperbarui...";
+      location.reload();
+      return;
+    }
+    label.textContent = detik;
+  }, 1000);
+  document.getElementById("segarkan").addEventListener("click", function () {
+    this.textContent = "Sinkronisasi...";
+    status.innerHTML = "Memperbarui...";
+    location.reload();
+  });
+  </script>
+</body>
+</html>

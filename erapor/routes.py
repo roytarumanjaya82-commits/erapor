@@ -2,10 +2,10 @@ from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from uuid import uuid4
 
-from flask import Blueprint, flash, redirect, render_template, request, session, url_for
+from flask import Blueprint, flash, redirect, render_template, request, send_file, session, url_for
 from .auth import login_required
 from .db import execute, query, transaction
-from .guru_excel import parse_guru_file, replace_guru
+from .guru_excel import formulir_guru, parse_guru_file, replace_guru
 
 class InputError(ValueError):
     pass
@@ -285,6 +285,17 @@ def data_guru():
     else:
         rows = query("SELECT * FROM guru ORDER BY nama")
     return render_template("list_guru.html", rows=rows, q=q, nav="guru")
+
+
+@bp.route("/admin/guru/form-excel")
+@login_required
+def form_excel_guru():
+    return send_file(
+        formulir_guru(),
+        as_attachment=True,
+        download_name="Form Data Guru.xlsx",
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
 
 
 @bp.route("/admin/guru/upload", methods=["POST"])

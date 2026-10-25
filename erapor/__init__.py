@@ -9,28 +9,40 @@ def create_app():
     app.config.from_object(Config)
     init_app(app)
 
+    from .access import TUGAS_LABEL, guard_request, load_tugas
     from .auth import bp as auth_bp
+    from .menu_routes import bp as menu_bp
     from .routes import InputError, bp as main_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(main_bp)
+    app.register_blueprint(menu_bp)
+    app.before_request(guard_request)
 
     @app.context_processor
     def inject_globals():
         user = None
+        tugas = set()
         if session.get("user_id"):
+            tugas = load_tugas()
             user = {
                 "id": session["user_id"],
                 "nama": session.get("nama"),
                 "role": session.get("role"),
                 "username": session.get("username"),
+                "guru_id": session.get("guru_id"),
             }
         ta = None
         try:
             ta = query("SELECT * FROM tahun_ajaran WHERE aktif=1 LIMIT 1", one=True)
         except Exception:
             ta = None
-        return {"current_user": user, "tahun_aktif": ta}
+        return {
+            "current_user": user,
+            "tahun_aktif": ta,
+            "tugas": tugas,
+            "tugas_label": TUGAS_LABEL,
+        }
 
     def _back():
         ref = request.referrer or ""

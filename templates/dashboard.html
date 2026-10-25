@@ -7,7 +7,9 @@
     <div>
       <div class="kicker">PORTAL ERAPOR SMPM22SETIABUDIPAMULANG — SMP MUHAMMADIYAH 22 SETIABUDI PAMULANG</div>
       <h2>Selamat Datang, {{ current_user.nama }}</h2>
-      <span class="badge">Admin Sekolah</span>
+      {% for kode in tugas %}
+      <span class="badge">{{ tugas_label.get(kode, kode) }}</span>
+      {% endfor %}
     </div>
     {% if tahun_aktif %}
     <span class="year-pill">Tahun Ajaran {{ tahun_aktif.tahun }} Semester {{ tahun_aktif.semester }}</span>

@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Dashboard Publik{% endblock %}
+{% block content %}
+<h1 class="page-title">Dashboard Publik</h1>
+<div class="card">
+  <div class="kicker">MONITORING PUBLIK PROGRES NILAI</div>
+  <h2>Progress Pengisian Nilai Rapor</h2>
+  <p class="sub">Ringkasan capaian sekolah pada tahun ajaran berjalan.</p>
+  <div class="stats">
+    <div class="stat"><div><div class="lbl">CAPAIAN</div><div class="val">{{ stats.pct }}%</div></div></div>
+    <div class="stat"><div><div class="lbl">MAPEL LENGKAP</div><div class="val">{{ stats.lengkap }}/{{ stats.pelajaran }}</div></div></div>
+    <div class="stat"><div><div class="lbl">GURU</div><div class="val">{{ stats.guru }}</div></div></div>
+    <div class="stat"><div><div class="lbl">SISWA</div><div class="val">{{ stats.siswa }}</div></div></div>
+  </div>
+</div>
+{% endblock %}

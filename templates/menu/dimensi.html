@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Dimensi Sikap{% endblock %}
+{% block content %}
+<h1 class="page-title">Dimensi Sikap</h1>
+{% if 'admin' in tugas %}
+<div class="card">
+  <form method="post" class="form-grid">
+    <div><label>Nama dimensi</label><input name="nama" required></div>
+    <div><label>Urutan</label><input type="number" name="urutan" value="0"></div>
+    <div class="full"><label>Indikator</label><textarea name="indikator"></textarea></div>
+    <div class="full">
+      <label class="check"><input type="checkbox" name="kelas_7" checked> Kelas 7</label>
+      <label class="check"><input type="checkbox" name="kelas_8" checked> Kelas 8</label>
+      <label class="check"><input type="checkbox" name="kelas_9" checked> Kelas 9</label>
+    </div>
+    <div><button class="btn btn-primary">Tambah</button></div>
+  </form>
+</div>
+{% endif %}
+<div class="card" style="padding:8px 16px 16px">
+  <table class="data">
+    <thead><tr><th>No</th><th>Dimensi</th><th>Indikator</th><th>7</th><th>8</th><th>9</th><th></th></tr></thead>
+    <tbody>
+    {% for r in rows %}
+      <tr>
+        <td>{{ r.urutan }}</td><td>{{ r.nama }}</td><td>{{ r.indikator }}</td>
+        <td>{{ 'Ya' if r.kelas_7 else '-' }}</td><td>{{ 'Ya' if r.kelas_8 else '-' }}</td><td>{{ 'Ya' if r.kelas_9 else '-' }}</td>
+        <td>{% if 'admin' in tugas %}<form method="post" action="{{ url_for('menu.hapus_dimensi', item_id=r.id) }}"><button class="btn btn-danger btn-sm">Hapus</button></form>{% endif %}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

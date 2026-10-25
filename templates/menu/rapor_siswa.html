@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <title>Rapor {{ siswa.nama }}</title>
+  <style>
+    body { font-family: "Times New Roman", serif; margin: 24px; color: #111; }
+    h1 { text-align: center; font-size: 18px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+    th, td { border: 1px solid #333; padding: 4px 6px; font-size: 12px; }
+    .meta { width: 100%; margin-bottom: 8px; }
+    .meta td { border: 0; }
+    .ttd { margin-top: 28px; display: flex; justify-content: space-between; }
+    @media print { button { display: none; } }
+  </style>
+</head>
+<body>
+  <button onclick="window.print()">Cetak</button>
+  <h1>LAPORAN HASIL BELAJAR</h1>
+  <table class="meta">
+    <tr><td>Nama sekolah</td><td>: {{ sekolah.nama or 'SMP Muhammadiyah 22 Setiabudi Pamulang' }}</td><td>Kelas</td><td>: {{ siswa.kelas_nama }}</td></tr>
+    <tr><td>Nama siswa</td><td>: {{ siswa.nama }}</td><td>Semester</td><td>: {{ ta.semester if ta else '-' }}</td></tr>
+    <tr><td>NIS / NISN</td><td>: {{ siswa.nis }} / {{ siswa.nisn or '-' }}</td><td>Tahun ajaran</td><td>: {{ ta.tahun if ta else '-' }}</td></tr>
+  </table>
+  <table>
+    <thead><tr><th>No</th><th>Mata pelajaran</th><th>KKM</th><th>Nilai sumatif</th></tr></thead>
+    <tbody>
+    {% for m in mapel %}
+      <tr><td>{{ loop.index }}</td><td>{{ m.nama }}</td><td>{{ m.kkm or 75 }}</td><td>{{ m.nilai if m.nilai is not none else '-' }}</td></tr>
+    {% else %}
+      <tr><td colspan="4">Belum ada mata pelajaran untuk kelas ini.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  <h3>Pengembangan diri / ekstrakurikuler</h3>
+  <table>
+    <thead><tr><th>No</th><th>Kegiatan</th><th>Nilai</th></tr></thead>
+    <tbody>
+    {% for e in ekskul %}<tr><td>{{ loop.index }}</td><td>{{ e.nama }}</td><td>{{ e.nilai }}</td></tr>
+    {% else %}<tr><td colspan="3">Belum ada nilai ekstrakurikuler.</td></tr>{% endfor %}
+    </tbody>
+  </table>
+  <div class="ttd">
+    <div>Orang tua / wali siswa<br><br><br>....................</div>
+    <div>Wali kelas<br><br><br>{{ siswa.wali or '-' }}{% if siswa.gelar_belakang %}, {{ siswa.gelar_belakang }}{% endif %}</div>
+    <div>Kepala sekolah<br><br><br>{{ sekolah.kepala_sekolah or '-' }}</div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Leger Nilai{% endblock %}
+{% block content %}
+<h1 class="page-title">Leger Nilai per Kelas</h1>
+<form method="get" class="toolbar">
+  <select name="kelas_id" class="search" onchange="this.form.submit()">
+    <option value="">Pilih kelas</option>
+    {% for k in kelas %}<option value="{{ k.id }}" {% if kelas_id==k.id|string %}selected{% endif %}>{{ k.nama }}</option>{% endfor %}
+  </select>
+</form>
+{% if info %}
+<div class="stats">
+  <div class="stat"><div><div class="lbl">KELAS</div><div class="val">{{ info.nama }}</div></div></div>
+  <div class="stat"><div><div class="lbl">WALI KELAS</div><div class="val" style="font-size:16px">{{ info.wali or '-' }}</div></div></div>
+  <div class="stat"><div><div class="lbl">SISWA</div><div class="val">{{ info.siswa }}</div></div></div>
+  <div class="stat"><div><div class="lbl">MAPEL</div><div class="val">{{ mapel|length }}</div></div></div>
+</div>
+{% endif %}
+<div class="card" style="padding:8px 16px 16px;overflow:auto">
+  <table class="data">
+    <thead>
+      <tr><th>No</th><th>NISN</th><th>Nama</th><th>L/P</th>{% for m in mapel %}<th>{{ m.nama }}</th>{% endfor %}</tr>
+    </thead>
+    <tbody>
+    {% for s in siswa %}
+      <tr>
+        <td>{{ loop.index }}</td><td>{{ s.nisn or s.nis }}</td><td>{{ s.nama }}</td><td>{{ s.jenis_kelamin }}</td>
+        {% for n in s.nilai %}<td>{{ n if n is not none else '-' }}</td>{% endfor %}
+      </tr>
+    {% else %}
+      <tr><td colspan="4">Pilih kelas untuk menampilkan leger.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

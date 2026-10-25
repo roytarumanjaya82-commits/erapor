@@ -22,38 +22,69 @@
   </header>
   <div class="layout">
     <aside class="sidebar">
-      <a class="nav-item {% if nav=='perencanaan' %}active{% endif %}" href="{{ url_for('main.perencanaan') }}">
-        <span class="dot">▤</span> Perencanaan Penilaian (KKM/K...
-      </a>
+      {% set adalah_admin = 'admin' in tugas %}
+      {% set bisa_mapel = adalah_admin or 'bidang_studi' in tugas %}
+      {% set bisa_walas = adalah_admin or 'walas' in tugas %}
+      {% set bisa_ekskul = adalah_admin or 'ekskul' in tugas %}
+      {% set bisa_tahfidz = adalah_admin or 'tahfidz' in tugas %}
+      <a class="nav-item {% if nav=='dashboard' %}active{% endif %}" href="{{ url_for('main.dashboard') }}"><span class="dot">⌂</span> Dasbor</a>
+      {% if adalah_admin or bisa_mapel or bisa_walas %}
+      <div class="nav-label">Monitoring</div>
+      {% if adalah_admin %}<a class="nav-item {% if nav=='publik' %}active{% endif %}" href="{{ url_for('menu.publik') }}"><span class="dot">◉</span> Dashboard Publik</a>{% endif %}
+      {% if bisa_mapel %}<a class="nav-item {% if nav=='audit' %}active{% endif %}" href="{{ url_for('menu.audit') }}"><span class="dot">✓</span> Audit Guru Mapel</a>{% endif %}
+      {% if adalah_admin or bisa_walas or bisa_mapel %}<a class="nav-item {% if nav=='leger' %}active{% endif %}" href="{{ url_for('menu.leger') }}"><span class="dot">▤</span> Leger Nilai</a>{% endif %}
+      {% if adalah_admin or bisa_walas %}<a class="nav-item {% if nav=='cetak' %}active{% endif %}" href="{{ url_for('menu.cetak_rapor') }}"><span class="dot">⎙</span> Cetak Rapor Sumatif</a>{% endif %}
+      {% endif %}
+      {% if adalah_admin %}
+      <div class="nav-label">Pengaturan</div>
+      <a class="nav-item {% if nav=='dapodik' %}active{% endif %}" href="{{ url_for('menu.dapodik') }}"><span class="dot">↻</span> Tarik Data Dapodik</a>
+      <a class="nav-item {% if nav=='pengguna' %}active{% endif %}" href="{{ url_for('menu.pengguna') }}"><span class="dot">☺</span> Data Pengguna</a>
+      <a class="nav-item {% if nav=='kosongkan' %}active{% endif %}" href="{{ url_for('menu.kosongkan') }}"><span class="dot">⌫</span> Kosongkan Data</a>
+      <a class="nav-item {% if nav=='backup' %}active{% endif %}" href="{{ url_for('menu.backup') }}"><span class="dot">⇩</span> Backup & Restore</a>
+      {% endif %}
+      {% if adalah_admin or bisa_walas or bisa_mapel or bisa_ekskul %}
       <div class="nav-group">
-        <button class="nav-toggle" type="button" data-toggle="ref">
-          <span class="dot">▣</span> Data Referensi <span class="chev">▾</span>
-        </button>
+        <button class="nav-toggle" type="button" data-toggle="ref"><span class="dot">▣</span> Data Referensi <span class="chev">▾</span></button>
         <div class="children" id="ref">
+          {% if adalah_admin %}
           <a class="nav-item {% if nav=='sekolah' %}active{% endif %}" href="{{ url_for('main.data_sekolah') }}"><span class="dot">•</span> Data Sekolah</a>
           <a class="nav-item {% if nav=='guru' %}active{% endif %}" href="{{ url_for('main.data_guru') }}"><span class="dot">•</span> Data Guru</a>
           <a class="nav-item {% if nav=='kelas' %}active{% endif %}" href="{{ url_for('main.data_kelas') }}"><span class="dot">•</span> Data Kelas</a>
-          <a class="nav-item {% if nav=='siswa' %}active{% endif %}" href="{{ url_for('main.data_siswa') }}"><span class="dot">•</span> Data Siswa</a>
-          <a class="nav-item {% if nav=='pelajaran' %}active{% endif %}" href="{{ url_for('main.data_pelajaran') }}"><span class="dot">•</span> Data Pelajaran</a>
+          {% endif %}
+          {% if adalah_admin or bisa_walas %}<a class="nav-item {% if nav=='siswa' %}active{% endif %}" href="{{ url_for('main.data_siswa') }}"><span class="dot">•</span> Data Siswa</a>{% endif %}
+          {% if adalah_admin or bisa_mapel %}<a class="nav-item {% if nav=='pelajaran' %}active{% endif %}" href="{{ url_for('main.data_pelajaran') }}"><span class="dot">•</span> Data Pembelajaran</a>{% endif %}
+          {% if bisa_mapel %}<a class="nav-item {% if nav=='perencanaan' %}active{% endif %}" href="{{ url_for('main.perencanaan') }}"><span class="dot">•</span> Perencanaan Penilaian</a>{% endif %}
+          {% if bisa_mapel %}<a class="nav-item {% if nav=='nilaimapel' %}active{% endif %}" href="{{ url_for('menu.nilai_mapel') }}"><span class="dot">•</span> Input Nilai Mapel</a>{% endif %}
+          {% if adalah_admin %}
           <a class="nav-item {% if nav=='mapel' %}active{% endif %}" href="{{ url_for('main.data_mapel') }}"><span class="dot">•</span> Data Mata Pelajaran</a>
           <a class="nav-item {% if nav=='kelompok' %}active{% endif %}" href="{{ url_for('main.data_kelompok') }}"><span class="dot">•</span> Data Kelompok Mapel</a>
           <a class="nav-item {% if nav=='gabung' %}active{% endif %}" href="{{ url_for('main.gabung_mapel') }}"><span class="dot">•</span> Gabung Mapel</a>
           <a class="nav-item {% if nav=='mapping' %}active{% endif %}" href="{{ url_for('main.mapping_rapor') }}"><span class="dot">•</span> Data Mapping Rapor</a>
+          {% endif %}
+          {% if adalah_admin or bisa_ekskul %}
           <a class="nav-item {% if nav=='ekskul' %}active{% endif %}" href="{{ url_for('main.data_ekskul') }}"><span class="dot">•</span> Data Ekstra Kurikuler</a>
-          <a class="nav-item {% if nav=='tryout' %}active{% endif %}" href="{{ url_for('main.data_tryout') }}"><span class="dot">•</span> Data Tryout (Kelas 12)</a>
+          <a class="nav-item {% if nav=='nilaiekskul' %}active{% endif %}" href="{{ url_for('menu.nilai_ekskul') }}"><span class="dot">•</span> Nilai Ekstrakurikuler</a>
+          {% endif %}
+          {% if adalah_admin %}<a class="nav-item {% if nav=='tryout' %}active{% endif %}" href="{{ url_for('main.data_tryout') }}"><span class="dot">•</span> Data Tryout</a>{% endif %}
+          {% if adalah_admin or bisa_walas %}
+          <a class="nav-item {% if nav=='dimensi' %}active{% endif %}" href="{{ url_for('menu.dimensi') }}"><span class="dot">•</span> Dimensi Sikap</a>
+          <a class="nav-item {% if nav=='predikat' %}active{% endif %}" href="{{ url_for('menu.predikat') }}"><span class="dot">•</span> Predikat Sikap</a>
+          {% endif %}
         </div>
       </div>
+      {% endif %}
+      {% if adalah_admin or bisa_tahfidz or bisa_walas %}
       <div class="nav-group">
-        <button class="nav-toggle" type="button" data-toggle="tahfiz">
-          <span class="dot">✦</span> Rapor Tahfiz <span class="chev">▾</span>
-        </button>
+        <button class="nav-toggle" type="button" data-toggle="tahfiz"><span class="dot">✦</span> Rapor Tahfiz <span class="chev">▾</span></button>
         <div class="children" id="tahfiz">
-          <a class="nav-item {% if nav=='aspek' %}active{% endif %}" href="{{ url_for('main.aspek_tahfiz') }}"><span class="dot">•</span> Aspek / Mapel Tahfiz</a>
-          <a class="nav-item {% if nav=='maptahfiz' %}active{% endif %}" href="{{ url_for('main.mapping_tahfiz') }}"><span class="dot">•</span> Mapping Guru Tahfiz</a>
-          <a class="nav-item {% if nav=='pengtahfiz' %}active{% endif %}" href="{{ url_for('main.pengaturan_tahfiz') }}"><span class="dot">•</span> Pengaturan Rapor Tahfiz</a>
-          <a class="nav-item {% if nav=='nilaitahfiz' %}active{% endif %}" href="{{ url_for('main.nilai_tahfiz') }}"><span class="dot">•</span> Input Nilai Tahfiz</a>
+          {% if adalah_admin or bisa_tahfidz %}<a class="nav-item {% if nav=='aspek' %}active{% endif %}" href="{{ url_for('main.aspek_tahfiz') }}"><span class="dot">•</span> Aspek / Mapel Tahfiz</a>{% endif %}
+          {% if adalah_admin %}<a class="nav-item {% if nav=='maptahfiz' %}active{% endif %}" href="{{ url_for('main.mapping_tahfiz') }}"><span class="dot">•</span> Mapping Guru Tahfiz</a>{% endif %}
+          {% if adalah_admin %}<a class="nav-item {% if nav=='pengtahfiz' %}active{% endif %}" href="{{ url_for('main.pengaturan_tahfiz') }}"><span class="dot">•</span> Pengaturan Rapor Tahfiz</a>{% endif %}
+          {% if adalah_admin or bisa_tahfidz %}<a class="nav-item {% if nav=='nilaitahfiz' %}active{% endif %}" href="{{ url_for('main.nilai_tahfiz') }}"><span class="dot">•</span> Input Nilai Tahfiz</a>{% endif %}
+          {% if adalah_admin or bisa_tahfidz or bisa_walas %}<a class="nav-item {% if nav=='cetaktahfiz' %}active{% endif %}" href="{{ url_for('menu.cetak_tahfiz') }}"><span class="dot">•</span> Cetak Rapor Tahfiz</a>{% endif %}
         </div>
       </div>
+      {% endif %}
     </aside>
     <main class="content">
       {% with messages = get_flashed_messages(with_categories=true) %}

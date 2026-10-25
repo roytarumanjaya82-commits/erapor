@@ -1,7 +1,7 @@
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
 
-from flask import Blueprint, flash, redirect, render_template, request, url_for
+from flask import Blueprint, flash, redirect, render_template, request, session, url_for
 from .auth import login_required
 from .db import execute, query, transaction
 from .guru_excel import parse_guru_file, replace_guru
@@ -359,6 +359,9 @@ def data_siswa():
         sql += " AND (s.nama LIKE %s OR s.nis LIKE %s OR s.nisn LIKE %s)"
         like = f"%{q}%"
         params.extend([like, like, like])
+    if "admin" not in set(session.get("tugas") or []) and session.get("role") != "admin":
+        sql += " AND s.kelas_id IN (SELECT id FROM kelas WHERE wali_kelas_id=%s)"
+        params.append(session.get("guru_id") or 0)
     if kelas_id:
         sql += " AND s.kelas_id=%s"
         params.append(kelas_id)
@@ -511,6 +514,11 @@ def hapus_mapel(item_id):
 @login_required
 def data_pelajaran():
     ta_id = _ta_id()
+    extra = ""
+    params = [ta_id]
+    if "admin" not in set(session.get("tugas") or []) and session.get("role") != "admin":
+        extra = " AND p.guru_id=%s"
+        params.append(session.get("guru_id") or 0)
     rows = query(
         """SELECT p.*, k.nama AS kelas_nama, m.nama AS mapel_nama, g.nama AS guru_nama
            FROM pelajaran p
@@ -518,8 +526,8 @@ def data_pelajaran():
            JOIN mata_pelajaran m ON m.id=p.mapel_id
            JOIN guru g ON g.id=p.guru_id
            WHERE p.tahun_ajaran_id=%s
-           ORDER BY """ + ORDER_KELAS_K + ", m.nama",
-        (ta_id,),
+           """ + extra + " ORDER BY " + ORDER_KELAS_K + ", m.nama",
+        params,
     ) if ta_id else []
     return render_template("list_pelajaran.html", rows=rows, nav="pelajaran")
 
@@ -629,16 +637,27 @@ def mapping_rapor():
 @login_required
 def data_ekskul():
     if request.method == "POST":
+        if "admin" not in set(session.get("tugas") or []) and session.get("role") != "admin":
+            flash("Hanya admin yang dapat menambah ekstrakurikuler.", "error")
+            return redirect(url_for("main.data_ekskul"))
         execute(
             "INSERT INTO ekstrakurikuler (nama, pembina_id) VALUES (%s,%s)",
             (request.form.get("nama"), request.form.get("pembina_id") or None),
         )
         flash("Ekstrakurikuler ditambahkan.", "success")
         return redirect(url_for("main.data_ekskul"))
-    rows = query(
-        """SELECT e.*, g.nama AS pembina FROM ekstrakurikuler e
-           LEFT JOIN guru g ON g.id=e.pembina_id ORDER BY e.nama"""
-    )
+    if "admin" not in set(session.get("tugas") or []) and session.get("role") != "admin":
+        rows = query(
+            """SELECT e.*, g.nama AS pembina FROM ekstrakurikuler e
+               LEFT JOIN guru g ON g.id=e.pembina_id
+               WHERE e.pembina_id=%s ORDER BY e.nama""",
+            (session.get("guru_id") or 0,),
+        )
+    else:
+        rows = query(
+            """SELECT e.*, g.nama AS pembina FROM ekstrakurikuler e
+               LEFT JOIN guru g ON g.id=e.pembina_id ORDER BY e.nama"""
+        )
     guru = query("SELECT id, nama FROM guru WHERE aktif=1 ORDER BY nama")
     return render_template("list_ekskul.html", rows=rows, guru=guru, nav="ekskul")
 
@@ -679,6 +698,11 @@ def hapus_tryout(item_id):
 @login_required
 def perencanaan():
     ta_id = _ta_id()
+    extra = ""
+    params = [ta_id]
+    if "admin" not in set(session.get("tugas") or []) and session.get("role") != "admin":
+        extra = " AND pel.guru_id=%s"
+        params.append(session.get("guru_id") or 0)
     rows = query(
         """SELECT pel.id, k.nama AS kelas_nama, m.nama AS mapel_nama, g.nama AS guru_nama,
                   r.id AS rencana_id, r.jumlah_tp, r.kkm, r.mapped
@@ -688,8 +712,8 @@ def perencanaan():
            JOIN guru g ON g.id=pel.guru_id
            LEFT JOIN perencanaan_penilaian r ON r.pelajaran_id=pel.id
            WHERE pel.tahun_ajaran_id=%s
-           ORDER BY k.nama, m.nama""",
-        (ta_id,),
+           """ + extra + " ORDER BY k.nama, m.nama",
+        params,
     ) if ta_id else []
     return render_template("perencanaan.html", rows=rows, nav="perencanaan")
 
@@ -697,6 +721,15 @@ def perencanaan():
 @bp.route("/admin/perencanaan/simpan/<int:pelajaran_id>", methods=["POST"])
 @login_required
 def simpan_perencanaan(pelajaran_id):
+    if "admin" not in set(session.get("tugas") or []) and session.get("role") != "admin":
+        milik = query(
+            "SELECT id FROM pelajaran WHERE id=%s AND guru_id=%s",
+            (pelajaran_id, session.get("guru_id") or 0),
+            one=True,
+        )
+        if not milik:
+            flash("Perencanaan ini bukan tugas Anda.", "error")
+            return redirect(url_for("main.perencanaan"))
     jumlah = to_int(request.form.get("jumlah_tp"), 4)
     kkm = to_int(request.form.get("kkm"), 75)
     mapped = 1 if request.form.get("mapped") else 0
@@ -820,10 +853,19 @@ def nilai_tahfiz():
                WHERE s.kelas_id=%s AND s.status='aktif' ORDER BY s.nama""",
             (aspek_id, ta_id, kelas_id),
         )
+    if "admin" in set(session.get("tugas") or []) or session.get("role") == "admin":
+        kelas_opsi = query(f"SELECT id,nama FROM kelas ORDER BY {ORDER_KELAS}")
+    else:
+        kelas_opsi = query(
+            f"""SELECT DISTINCT k.id, k.nama FROM kelas k
+                JOIN mapping_guru_tahfiz m ON m.kelas_id=k.id
+                WHERE m.guru_id=%s ORDER BY {ORDER_KELAS_K}""",
+            (session.get("guru_id") or 0,),
+        )
     return render_template(
         "nilai_tahfiz.html",
         siswa=siswa,
-        kelas=query(f"SELECT id,nama FROM kelas ORDER BY {ORDER_KELAS}"),
+        kelas=kelas_opsi,
         aspek=query("SELECT id,nama FROM aspek_tahfiz"),
         kelas_id=kelas_id,
         aspek_id=aspek_id,

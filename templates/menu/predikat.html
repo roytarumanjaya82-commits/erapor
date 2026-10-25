@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Predikat Sikap{% endblock %}
+{% block content %}
+<h1 class="page-title">Opsi Predikat Nilai Sikap</h1>
+{% if 'admin' in tugas %}
+<div class="card">
+  <form method="post" class="form-grid">
+    <div><label>Nama</label><input name="nama" required></div>
+    <div><label>Urutan</label><input type="number" name="urutan" value="0"></div>
+    <div class="full"><label>Format deskripsi</label><input name="deskripsi"></div>
+    <div><button class="btn btn-primary">Tambah</button></div>
+  </form>
+</div>
+{% endif %}
+<div class="card" style="padding:8px 16px 16px">
+  <table class="data">
+    <thead><tr><th>Urutan</th><th>Predikat</th><th>Deskripsi</th><th></th></tr></thead>
+    <tbody>
+    {% for r in rows %}
+      <tr>
+        <td>{{ r.urutan }}</td><td>{{ r.nama }}</td><td>{{ r.deskripsi }}</td>
+        <td>{% if 'admin' in tugas %}<form method="post" action="{{ url_for('menu.hapus_predikat', item_id=r.id) }}"><button class="btn btn-danger btn-sm">Hapus</button></form>{% endif %}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

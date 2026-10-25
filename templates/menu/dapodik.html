@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Tarik Data Dapodik{% endblock %}
+{% block content %}
+<h1 class="page-title">Sinkronisasi Dapodik</h1>
+<div class="card">
+  <h3>Panel Sinkronisasi Dapodik</h3>
+  <p>Tarik data sekolah, guru, rombongan belajar, pembelajaran, dan siswa dari web service Dapodik.</p>
+  <p>Koneksi web service Dapodik belum diisi. Data yang ada di aplikasi tetap data lokal dan tidak berubah sampai koneksi resmi tersedia.</p>
+  <form method="post" onsubmit="alert('Alamat web service Dapodik belum diatur.'); return false;">
+    <button class="btn btn-ghost" type="button" onclick="alert('Tidak terhubung. Parameter web service belum diisi.')">Uji Koneksi API</button>
+    <button class="btn btn-primary" type="submit">Tarik Semua Data Sekaligus</button>
+  </form>
+</div>
+{% endblock %}

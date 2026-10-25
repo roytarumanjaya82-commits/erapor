@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Nilai Ekstrakurikuler{% endblock %}
+{% block content %}
+<h1 class="page-title">Nilai Ekstrakurikuler</h1>
+<form method="get" class="toolbar">
+  <select name="ekskul_id" class="search">
+    <option value="">Pilih ekskul</option>
+    {% for e in ekskul %}<option value="{{ e.id }}" {% if ekskul_id==e.id|string %}selected{% endif %}>{{ e.nama }}</option>{% endfor %}
+  </select>
+  <select name="kelas_id" class="search">
+    <option value="">Pilih kelas</option>
+    {% for k in kelas %}<option value="{{ k.id }}" {% if kelas_id==k.id|string %}selected{% endif %}>{{ k.nama }}</option>{% endfor %}
+  </select>
+  <button class="btn btn-ghost">Tampilkan</button>
+</form>
+{% if siswa %}
+<div class="card">
+  <form method="post" action="{{ url_for('menu.simpan_ekskul') }}">
+    <input type="hidden" name="ekskul_id" value="{{ ekskul_id }}">
+    <input type="hidden" name="kelas_id" value="{{ kelas_id }}">
+    <table class="data">
+      <thead><tr><th>NIS</th><th>Nama</th><th>Nilai</th></tr></thead>
+      <tbody>
+      {% for s in siswa %}
+        <tr>
+          <td>{{ s.nis }}<input type="hidden" name="siswa_id" value="{{ s.id }}"></td>
+          <td>{{ s.nama }}</td>
+          <td><input name="nilai_{{ s.id }}" value="{{ s.nilai or '' }}" placeholder="Baik / Cukup / Kurang"></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    <div class="form-actions"><button class="btn btn-primary">Simpan nilai</button></div>
+  </form>
+</div>
+{% elif not ekskul %}
+<div class="card"><p>Belum ada ekstrakurikuler pada tugas Anda. Admin dapat menetapkan pembina di Data Ekstra Kurikuler.</p></div>
+{% endif %}
+{% endblock %}

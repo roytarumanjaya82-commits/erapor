@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Audit Guru Mapel{% endblock %}
+{% block content %}
+<h1 class="page-title">Audit Guru Mapel</h1>
+<div class="card" style="padding:8px 16px 16px">
+  <table class="data">
+    <thead><tr><th>Kelas</th><th>Mata pelajaran</th><th>Guru pengampu</th><th>Formatif</th><th>Sumatif</th><th>Status</th></tr></thead>
+    <tbody>
+    {% for r in rows %}
+      <tr>
+        <td>{{ r.kelas_nama }}</td><td>{{ r.mapel_nama }}</td><td>{{ r.guru_nama }}</td>
+        <td>{{ r.fmt }}%</td><td>{{ r.sum }}%</td><td>{{ r.status }}</td>
+      </tr>
+    {% else %}
+      <tr><td colspan="6">Belum ada pembelajaran pada tugas Anda.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Data Pengguna{% endblock %}
+{% block content %}
+<h1 class="page-title">Data Pengguna</h1>
+<div class="toolbar">
+  <div>
+    <a class="btn {% if tab=='admin' %}btn-primary{% else %}btn-ghost{% endif %}" href="{{ url_for('menu.pengguna', tab='admin') }}">Administrator</a>
+    <a class="btn {% if tab=='guru' %}btn-primary{% else %}btn-ghost{% endif %}" href="{{ url_for('menu.pengguna', tab='guru') }}">Guru</a>
+    <a class="btn {% if tab=='siswa' %}btn-primary{% else %}btn-ghost{% endif %}" href="{{ url_for('menu.pengguna', tab='siswa') }}">Siswa</a>
+  </div>
+  <div style="display:flex;gap:8px">
+    <form method="post" action="{{ url_for('menu.generate_guru') }}"><button class="btn btn-primary">Generate akun guru</button></form>
+    <form method="post" action="{{ url_for('menu.generate_siswa') }}"><button class="btn btn-ghost">Generate akun siswa</button></form>
+  </div>
+</div>
+<div class="card" style="margin-bottom:16px">
+  <h3>Tambah pengguna guru</h3>
+  <p class="sub">Centang tugas yang boleh diinput. Menu guru mengikuti centang ini, ditambah tugas yang terbaca dari wali kelas, pelajaran, ekskul, atau tahfidz.</p>
+  <form method="post">
+    <div class="form-grid">
+      <div><label>Username</label><input name="username" required></div>
+      <div><label>Nama</label><input name="nama" required></div>
+      <div><label>Kata sandi awal</label><input name="password" value="guru123"></div>
+      <div>
+        <label>Guru</label>
+        <select name="guru_id"><option value="">-</option>{% for g in guru %}<option value="{{ g.id }}">{{ g.nama }}</option>{% endfor %}</select>
+      </div>
+      <div class="full">
+        <label class="check"><input type="checkbox" name="tugas" value="bidang_studi"> Guru bidang studi</label>
+        <label class="check"><input type="checkbox" name="tugas" value="walas"> Wali kelas</label>
+        <label class="check"><input type="checkbox" name="tugas" value="ekskul"> Guru ekstrakurikuler</label>
+        <label class="check"><input type="checkbox" name="tugas" value="tahfidz"> Guru tahfidz</label>
+      </div>
+    </div>
+    <div class="form-actions"><button class="btn btn-primary">Simpan pengguna</button></div>
+  </form>
+</div>
+<div class="card" style="padding:8px 16px 16px">
+  <table class="data">
+    <thead><tr><th>Username</th><th>Nama</th><th>Level</th><th>Tugas</th></tr></thead>
+    <tbody>
+    {% for r in rows %}
+      <tr>
+        <td>{{ r.username }}</td><td>{{ r.nama }}</td><td>{{ r.role }}</td><td>{{ r.tugas_nama or '-' }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

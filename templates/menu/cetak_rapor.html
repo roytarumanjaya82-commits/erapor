@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Cetak Rapor Sumatif{% endblock %}
+{% block content %}
+<h1 class="page-title">Cetak Rapor Sumatif</h1>
+<form method="get" class="toolbar">
+  <label>Pilih kelas bimbingan</label>
+  <select name="kelas_id" class="search" onchange="this.form.submit()">
+    <option value="">Pilih kelas</option>
+    {% for k in kelas %}<option value="{{ k.id }}" {% if kelas_id==k.id|string %}selected{% endif %}>{{ k.nama }}</option>{% endfor %}
+  </select>
+</form>
+<div class="card" style="padding:8px 16px 16px">
+  <table class="data">
+    <thead><tr><th>Nama siswa</th><th>NISN</th><th>L/P</th><th></th></tr></thead>
+    <tbody>
+    {% for s in siswa %}
+      <tr>
+        <td>{{ s.nama }}</td><td>{{ s.nisn or '-' }}</td><td>{{ 'Laki-laki' if s.jenis_kelamin=='L' else 'Perempuan' }}</td>
+        <td><a class="btn btn-primary btn-sm" href="{{ url_for('menu.rapor_siswa', siswa_id=s.id) }}" target="_blank">Cetak Rapor</a></td>
+      </tr>
+    {% else %}
+      <tr><td colspan="4">Pilih kelas terlebih dahulu.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

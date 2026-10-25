@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Backup dan Restore{% endblock %}
+{% block content %}
+<h1 class="page-title">Backup & Restore</h1>
+<div class="card">
+  <h3>Unduh backup</h3>
+  <p>File SQL berisi data akademik sekolah. Simpan di tempat yang aman.</p>
+  <a class="btn btn-primary" href="{{ url_for('menu.backup_unduh') }}">Unduh backup</a>
+</div>
+<div class="card">
+  <h3>Pulihkan dari file</h3>
+  <p>Hanya file backup yang diunduh dari aplikasi ini yang dapat dipulihkan.</p>
+  <form method="post" action="{{ url_for('menu.restore') }}" enctype="multipart/form-data" onsubmit="return confirm('Data saat ini akan ditimpa isi backup. Lanjutkan?')">
+    <input type="file" name="berkas" accept=".sql" required>
+    <div class="form-actions"><button class="btn btn-primary">Jalankan restore</button></div>
+  </form>
+</div>
+{% endblock %}

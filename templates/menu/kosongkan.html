@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Kosongkan Data{% endblock %}
+{% block content %}
+<h1 class="page-title">Kosongkan Data</h1>
+<div class="card">
+  <p>Pengosongan bersifat permanen. Unduh backup terlebih dahulu. Akun administrator tidak dihapus.</p>
+  <table class="data">
+    <tr><td>Nilai formatif, sumatif, tahfiz, dan ekskul</td><td>{{ jumlah.nilai }}</td>
+      <td><form method="post"> <input type="hidden" name="aksi" value="nilai"><input name="konfirmasi" placeholder="Ketik KOSONGKAN" required><button class="btn btn-danger">Kosongkan nilai</button></form></td></tr>
+    <tr><td>Siswa {{ jumlah.siswa }}, guru {{ jumlah.guru }}, kelas {{ jumlah.kelas }}</td><td></td>
+      <td><form method="post"><input type="hidden" name="aksi" value="reset"><input name="konfirmasi" placeholder="Ketik RESET" required><button class="btn btn-danger">Reset data aplikasi</button></form></td></tr>
+  </table>
+</div>
+{% endblock %}

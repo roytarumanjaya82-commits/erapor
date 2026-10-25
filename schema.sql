@@ -62,8 +62,8 @@ CREATE TABLE guru (
   nuptk VARCHAR(30),
   nama VARCHAR(150) NOT NULL,
   gelar_depan VARCHAR(20) DEFAULT '',
-  gelar_belakang VARCHAR(50) DEFAULT '',
-  jenis_kelamin ENUM('L','P') DEFAULT 'L',
+  gelar_belakang VARCHAR(80) DEFAULT '',
+  jenis_kelamin ENUM('L','P') NULL,
   tempat_lahir VARCHAR(100),
   tanggal_lahir DATE,
   agama VARCHAR(20) DEFAULT 'Islam',
@@ -71,6 +71,9 @@ CREATE TABLE guru (
   no_hp VARCHAR(20),
   email VARCHAR(100),
   status_kepegawaian VARCHAR(50) DEFAULT 'Guru Tetap',
+  mapel_ajar TEXT NULL,
+  jumlah_jam INT NULL,
+  mengajar_di TEXT NULL,
   aktif TINYINT NOT NULL DEFAULT 1
 );
 

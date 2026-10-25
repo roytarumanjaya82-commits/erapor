@@ -23,6 +23,9 @@
       <div><label>No. HP</label><input type="text" name="no_hp" value="{{ row.no_hp or '' }}"></div>
       <div><label>Email</label><input type="email" name="email" value="{{ row.email or '' }}"></div>
       <div><label>Status kepegawaian</label><input type="text" name="status_kepegawaian" value="{{ row.status_kepegawaian or 'Guru Tetap' }}"></div>
+      <div class="full"><label>Mata pelajaran</label><input type="text" name="mapel_ajar" value="{{ row.mapel_ajar or '' }}"></div>
+      <div><label>Jumlah jam</label><input type="number" name="jumlah_jam" value="{{ row.jumlah_jam if row.jumlah_jam is not none else '' }}"></div>
+      <div><label>Mengajar di kelas</label><input type="text" name="mengajar_di" value="{{ row.mengajar_di or '' }}"></div>
       <div><label>Aktif</label><select name="aktif"><option value="1">Ya</option><option value="0" {% if row.aktif==0 %}selected{% endif %}>Tidak</option></select></div>
       <div class="full"><label>Alamat</label><textarea name="alamat">{{ row.alamat or '' }}</textarea></div>
     </div>

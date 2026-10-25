@@ -4,6 +4,7 @@ from decimal import Decimal, InvalidOperation
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 from .auth import login_required
 from .db import execute, query, transaction
+from .guru_excel import parse_guru_file, replace_guru
 
 class InputError(ValueError):
     pass
@@ -166,16 +167,38 @@ def data_sekolah():
 @bp.route("/admin/guru")
 @login_required
 def data_guru():
+    from .guru_excel import ensure_guru_columns
+    if not any(col["Field"] == "mapel_ajar" for col in query("SHOW COLUMNS FROM guru")):
+        ensure_guru_columns()
     q = (request.args.get("q") or "").strip()
     if q:
         like = f"%{q}%"
         rows = query(
-            "SELECT * FROM guru WHERE nama LIKE %s OR nip LIKE %s OR nuptk LIKE %s ORDER BY nama",
-            (like, like, like),
+            """SELECT * FROM guru
+               WHERE nama LIKE %s OR nip LIKE %s OR nuptk LIKE %s OR mapel_ajar LIKE %s
+               ORDER BY nama""",
+            (like, like, like, like),
         )
     else:
         rows = query("SELECT * FROM guru ORDER BY nama")
     return render_template("list_guru.html", rows=rows, q=q, nav="guru")
+
+
+@bp.route("/admin/guru/upload", methods=["POST"])
+@login_required
+def upload_guru():
+    berkas = request.files.get("berkas")
+    if not berkas or not berkas.filename:
+        flash("Pilih file Excel jadwal pelajaran terlebih dahulu.", "error")
+        return redirect(url_for("main.data_guru"))
+    try:
+        records = parse_guru_file(berkas.filename, berkas.read())
+        jumlah = replace_guru(records)
+    except Exception as exc:
+        flash(str(exc) or "File Excel tidak bisa dibaca.", "error")
+        return redirect(url_for("main.data_guru"))
+    flash(f"{jumlah} guru berhasil diunggah dan daftar guru diganti.", "success")
+    return redirect(url_for("main.data_guru"))
 
 
 @bp.route("/admin/guru/form", methods=["GET", "POST"])
@@ -204,21 +227,25 @@ def form_guru(item_id=None):
             request.form.get("no_hp"),
             request.form.get("email"),
             request.form.get("status_kepegawaian") or "Guru Tetap",
+            request.form.get("mapel_ajar"),
+            to_int(request.form.get("jumlah_jam"), 0),
+            request.form.get("mengajar_di"),
             to_int(request.form.get("aktif"), 1),
         )
         if item_id:
             execute(
                 """UPDATE guru SET nip=%s,nuptk=%s,nama=%s,gelar_depan=%s,gelar_belakang=%s,
                 jenis_kelamin=%s,tempat_lahir=%s,tanggal_lahir=%s,agama=%s,alamat=%s,no_hp=%s,
-                email=%s,status_kepegawaian=%s,aktif=%s WHERE id=%s""",
+                email=%s,status_kepegawaian=%s,mapel_ajar=%s,jumlah_jam=%s,mengajar_di=%s,aktif=%s WHERE id=%s""",
                 (*data, item_id),
             )
             flash("Data guru diperbarui.", "success")
         else:
             execute(
                 """INSERT INTO guru (nip,nuptk,nama,gelar_depan,gelar_belakang,jenis_kelamin,
-                tempat_lahir,tanggal_lahir,agama,alamat,no_hp,email,status_kepegawaian,aktif)
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+                tempat_lahir,tanggal_lahir,agama,alamat,no_hp,email,status_kepegawaian,
+                mapel_ajar,jumlah_jam,mengajar_di,aktif)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
                 data,
             )
             flash("Guru baru ditambahkan.", "success")

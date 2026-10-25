@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Form Kelas{% endblock %}
+{% block content %}
+<h1 class="page-title">{% if row.id %}Ubah Kelas{% else %}Tambah Kelas{% endif %}</h1>
+<div class="card">
+  <form method="post">
+    <div class="form-grid">
+      <div><label>Nama kelas</label><input type="text" name="nama" value="{{ row.nama or '' }}" required></div>
+      <div>
+        <label>Tingkat</label>
+        <select name="tingkat">
+          {% for t in ['X','XI','XII'] %}
+          <option value="{{ t }}" {% if row.tingkat==t %}selected{% endif %}>{{ t }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div><label>Jurusan</label><input type="text" name="jurusan" value="{{ row.jurusan or 'Umum' }}"></div>
+      <div><label>Kapasitas</label><input type="number" name="kapasitas" value="{{ row.kapasitas or 36 }}"></div>
+      <div class="full">
+        <label>Wali kelas</label>
+        <select name="wali_kelas_id">
+          <option value="">-</option>
+          {% for g in guru %}
+          <option value="{{ g.id }}" {% if row.wali_kelas_id==g.id %}selected{% endif %}>{{ g.nama }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-primary">Simpan</button>
+      <a class="btn btn-ghost" href="{{ url_for('main.data_kelas') }}">Batal</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

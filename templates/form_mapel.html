@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Form Mapel{% endblock %}
+{% block content %}
+<h1 class="page-title">{% if row.id %}Ubah Mapel{% else %}Tambah Mapel{% endif %}</h1>
+<div class="card">
+  <form method="post">
+    <div class="form-grid">
+      <div><label>Kode</label><input type="text" name="kode" value="{{ row.kode or '' }}" required></div>
+      <div><label>Nama</label><input type="text" name="nama" value="{{ row.nama or '' }}" required></div>
+      <div>
+        <label>Kelompok</label>
+        <select name="kelompok_id">
+          <option value="">-</option>
+          {% for k in kelompok %}
+          <option value="{{ k.id }}" {% if row.kelompok_id==k.id %}selected{% endif %}>{{ k.nama }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div><label>KKM default</label><input type="number" name="kkm_default" value="{{ row.kkm_default or 75 }}"></div>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-primary">Simpan</button>
+      <a class="btn btn-ghost" href="{{ url_for('main.data_mapel') }}">Batal</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

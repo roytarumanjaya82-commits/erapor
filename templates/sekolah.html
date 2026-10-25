@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Data Sekolah{% endblock %}
+{% block content %}
+<h1 class="page-title">Data Sekolah</h1>
+<div class="card">
+  <form method="post">
+    <div class="form-grid">
+      <div><label>Nama sekolah</label><input type="text" name="nama" value="{{ sekolah.nama or '' }}" required></div>
+      <div><label>NPSN</label><input type="text" name="npsn" value="{{ sekolah.npsn or '' }}"></div>
+      <div><label>Jenjang</label><input type="text" name="jenjang" value="{{ sekolah.jenjang or 'SMA' }}"></div>
+      <div><label>Kode pos</label><input type="text" name="kode_pos" value="{{ sekolah.kode_pos or '' }}"></div>
+      <div class="full"><label>Alamat</label><textarea name="alamat">{{ sekolah.alamat or '' }}</textarea></div>
+      <div><label>Kelurahan</label><input type="text" name="kelurahan" value="{{ sekolah.kelurahan or '' }}"></div>
+      <div><label>Kecamatan</label><input type="text" name="kecamatan" value="{{ sekolah.kecamatan or '' }}"></div>
+      <div><label>Kabupaten/Kota</label><input type="text" name="kabupaten" value="{{ sekolah.kabupaten or '' }}"></div>
+      <div><label>Provinsi</label><input type="text" name="provinsi" value="{{ sekolah.provinsi or '' }}"></div>
+      <div><label>Telepon</label><input type="text" name="telepon" value="{{ sekolah.telepon or '' }}"></div>
+      <div><label>Email</label><input type="email" name="email" value="{{ sekolah.email or '' }}"></div>
+      <div><label>Website</label><input type="text" name="website" value="{{ sekolah.website or '' }}"></div>
+      <div><label>Kepala sekolah</label><input type="text" name="kepala_sekolah" value="{{ sekolah.kepala_sekolah or '' }}"></div>
+      <div><label>NIP kepala sekolah</label><input type="text" name="nip_kepala" value="{{ sekolah.nip_kepala or '' }}"></div>
+    </div>
+    <div class="form-actions"><button class="btn btn-primary" type="submit">Simpan</button></div>
+  </form>
+</div>
+{% endblock %}

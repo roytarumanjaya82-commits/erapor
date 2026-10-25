@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Masuk — eRapor SMPM22SETIABUDIPAMULANG</title>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+</head>
+<body>
+  <div class="login-wrap">
+    <div class="card login-card">
+      <div class="brand"><span class="mark">e</span> eRapor SMPM22SETIABUDIPAMULANG</div>
+      <h1>Portal Akademik</h1>
+      <p>SMP Muhammadiyah 22 Setiabudi Pamulang</p>
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for cat, msg in messages %}
+          <div class="flash {{ cat }}">{{ msg }}</div>
+        {% endfor %}
+      {% endwith %}
+      <form method="post">
+        <div class="form-grid">
+          <div class="full">
+            <label>Username</label>
+            <input type="text" name="username" value="admin" required>
+          </div>
+          <div class="full">
+            <label>Kata sandi</label>
+            <input type="password" name="password" value="admin123" required>
+          </div>
+        </div>
+        <div class="form-actions">
+          <button class="btn btn-primary" type="submit">Masuk</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</body>
+</html>

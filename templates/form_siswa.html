@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Form Siswa{% endblock %}
+{% block content %}
+<h1 class="page-title">{% if row.id %}Ubah Siswa{% else %}Tambah Siswa{% endif %}</h1>
+<div class="card">
+  <form method="post">
+    <div class="form-grid">
+      <div><label>NIS</label><input type="text" name="nis" value="{{ row.nis or '' }}" required></div>
+      <div><label>NISN</label><input type="text" name="nisn" value="{{ row.nisn or '' }}"></div>
+      <div><label>Nama</label><input type="text" name="nama" value="{{ row.nama or '' }}" required></div>
+      <div>
+        <label>Jenis kelamin</label>
+        <select name="jenis_kelamin">
+          <option value="L" {% if row.jenis_kelamin=='L' %}selected{% endif %}>Laki-laki</option>
+          <option value="P" {% if row.jenis_kelamin=='P' %}selected{% endif %}>Perempuan</option>
+        </select>
+      </div>
+      <div><label>Tempat lahir</label><input type="text" name="tempat_lahir" value="{{ row.tempat_lahir or '' }}"></div>
+      <div><label>Tanggal lahir</label><input type="date" name="tanggal_lahir" value="{{ row.tanggal_lahir or '' }}"></div>
+      <div><label>Agama</label><input type="text" name="agama" value="{{ row.agama or 'Islam' }}"></div>
+      <div>
+        <label>Kelas</label>
+        <select name="kelas_id">
+          <option value="">-</option>
+          {% for k in kelas %}
+          <option value="{{ k.id }}" {% if row.kelas_id==k.id %}selected{% endif %}>{{ k.nama }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div><label>Nama ayah</label><input type="text" name="nama_ayah" value="{{ row.nama_ayah or '' }}"></div>
+      <div><label>Nama ibu</label><input type="text" name="nama_ibu" value="{{ row.nama_ibu or '' }}"></div>
+      <div><label>No. HP</label><input type="text" name="no_hp" value="{{ row.no_hp or '' }}"></div>
+      <div>
+        <label>Status</label>
+        <select name="status">
+          {% for s in ['aktif','lulus','pindah','dropout'] %}
+          <option value="{{ s }}" {% if row.status==s %}selected{% endif %}>{{ s }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="full"><label>Alamat</label><textarea name="alamat">{{ row.alamat or '' }}</textarea></div>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-primary">Simpan</button>
+      <a class="btn btn-ghost" href="{{ url_for('main.data_siswa') }}">Batal</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

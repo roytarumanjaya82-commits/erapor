@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Perencanaan Penilaian{% endblock %}
+{% block content %}
+<h1 class="page-title">Perencanaan Penilaian (KKM / Kriteria)</h1>
+<div class="card" style="padding:8px 16px 16px">
+  <table class="data">
+    <thead><tr><th>Kelas</th><th>Mapel</th><th>Guru</th><th>TP</th><th>KKM</th><th>Mapped</th><th></th></tr></thead>
+    <tbody>
+    {% for r in rows %}
+      <tr>
+        <td>{{ r.kelas_nama }}</td>
+        <td>{{ r.mapel_nama }}</td>
+        <td>{{ r.guru_nama }}</td>
+        <td><input form="f{{ r.id }}" type="number" name="jumlah_tp" value="{{ r.jumlah_tp or 4 }}" style="max-width:70px"></td>
+        <td><input form="f{{ r.id }}" type="number" name="kkm" value="{{ r.kkm or 75 }}" style="max-width:70px"></td>
+        <td><input form="f{{ r.id }}" type="checkbox" name="mapped" {% if r.mapped %}checked{% endif %}></td>
+        <td>
+          <form id="f{{ r.id }}" method="post" action="{{ url_for('main.simpan_perencanaan', pelajaran_id=r.id) }}">
+            <button class="btn btn-primary btn-sm">Simpan</button>
+          </form>
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

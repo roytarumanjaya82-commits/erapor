@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Kelompok Mapel{% endblock %}
+{% block content %}
+<h1 class="page-title">Data Kelompok Mapel</h1>
+<div class="card">
+  <form method="post" class="form-grid" style="margin-bottom:18px">
+    <div><label>Kode</label><input type="text" name="kode" required></div>
+    <div><label>Nama</label><input type="text" name="nama" required></div>
+    <div><label>Urutan</label><input type="number" name="urutan" value="0"></div>
+    <div style="display:flex;align-items:end"><button class="btn btn-primary">Tambah</button></div>
+  </form>
+  <table class="data">
+    <thead><tr><th>Kode</th><th>Nama</th><th>Urutan</th><th></th></tr></thead>
+    <tbody>
+    {% for r in rows %}
+      <tr>
+        <td>{{ r.kode }}</td><td>{{ r.nama }}</td><td>{{ r.urutan }}</td>
+        <td>
+          <form method="post" action="{{ url_for('main.hapus_kelompok', item_id=r.id) }}" onsubmit="return confirm('Hapus?')">
+            <button class="btn btn-danger btn-sm">Hapus</button>
+          </form>
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Mapping Rapor{% endblock %}
+{% block content %}
+<h1 class="page-title">Data Mapping Rapor</h1>
+<div class="card">
+  <form method="post">
+    <table class="data">
+      <thead><tr><th>Tampil</th><th>Mata pelajaran</th><th>Urutan</th></tr></thead>
+      <tbody>
+      {% for m in mapel %}
+        <tr>
+          <td><input type="checkbox" name="mapel_id" value="{{ m.id }}" {% if mapped.get(m.id) %}checked{% endif %}></td>
+          <td>{{ m.nama }}</td>
+          <td><input type="number" name="urutan_{{ m.id }}" value="{{ mapped[m.id].urutan if mapped.get(m.id) else loop.index }}" style="max-width:90px"></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    <div class="form-actions"><button class="btn btn-primary">Simpan mapping</button></div>
+  </form>
+</div>
+{% endblock %}

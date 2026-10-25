@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}eRapor SMPM22SETIABUDIPAMULANG{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="{{ url_for('main.dashboard') }}">
+      <span class="mark">e</span>
+      <span>eRapor SMPM22SETIABUDIPAMULANG</span>
+    </a>
+    <div class="userchip">
+      <span>{{ current_user.nama }}</span>
+      <span class="avatar">{{ current_user.nama[:1] }}</span>
+      <a class="btn btn-ghost btn-sm" href="{{ url_for('auth.logout') }}">Keluar</a>
+    </div>
+  </header>
+  <div class="layout">
+    <aside class="sidebar">
+      <a class="nav-item {% if nav=='perencanaan' %}active{% endif %}" href="{{ url_for('main.perencanaan') }}">
+        <span class="dot">▤</span> Perencanaan Penilaian (KKM/K...
+      </a>
+      <div class="nav-group">
+        <button class="nav-toggle" type="button" data-toggle="ref">
+          <span class="dot">▣</span> Data Referensi <span class="chev">▾</span>
+        </button>
+        <div class="children" id="ref">
+          <a class="nav-item {% if nav=='sekolah' %}active{% endif %}" href="{{ url_for('main.data_sekolah') }}"><span class="dot">•</span> Data Sekolah</a>
+          <a class="nav-item {% if nav=='guru' %}active{% endif %}" href="{{ url_for('main.data_guru') }}"><span class="dot">•</span> Data Guru</a>
+          <a class="nav-item {% if nav=='kelas' %}active{% endif %}" href="{{ url_for('main.data_kelas') }}"><span class="dot">•</span> Data Kelas</a>
+          <a class="nav-item {% if nav=='siswa' %}active{% endif %}" href="{{ url_for('main.data_siswa') }}"><span class="dot">•</span> Data Siswa</a>
+          <a class="nav-item {% if nav=='pelajaran' %}active{% endif %}" href="{{ url_for('main.data_pelajaran') }}"><span class="dot">•</span> Data Pelajaran</a>
+          <a class="nav-item {% if nav=='mapel' %}active{% endif %}" href="{{ url_for('main.data_mapel') }}"><span class="dot">•</span> Data Mata Pelajaran</a>
+          <a class="nav-item {% if nav=='kelompok' %}active{% endif %}" href="{{ url_for('main.data_kelompok') }}"><span class="dot">•</span> Data Kelompok Mapel</a>
+          <a class="nav-item {% if nav=='gabung' %}active{% endif %}" href="{{ url_for('main.gabung_mapel') }}"><span class="dot">•</span> Gabung Mapel</a>
+          <a class="nav-item {% if nav=='mapping' %}active{% endif %}" href="{{ url_for('main.mapping_rapor') }}"><span class="dot">•</span> Data Mapping Rapor</a>
+          <a class="nav-item {% if nav=='ekskul' %}active{% endif %}" href="{{ url_for('main.data_ekskul') }}"><span class="dot">•</span> Data Ekstra Kurikuler</a>
+          <a class="nav-item {% if nav=='tryout' %}active{% endif %}" href="{{ url_for('main.data_tryout') }}"><span class="dot">•</span> Data Tryout (Kelas 12)</a>
+        </div>
+      </div>
+      <div class="nav-group">
+        <button class="nav-toggle" type="button" data-toggle="tahfiz">
+          <span class="dot">✦</span> Rapor Tahfiz <span class="chev">▾</span>
+        </button>
+        <div class="children" id="tahfiz">
+          <a class="nav-item {% if nav=='aspek' %}active{% endif %}" href="{{ url_for('main.aspek_tahfiz') }}"><span class="dot">•</span> Aspek / Mapel Tahfiz</a>
+          <a class="nav-item {% if nav=='maptahfiz' %}active{% endif %}" href="{{ url_for('main.mapping_tahfiz') }}"><span class="dot">•</span> Mapping Guru Tahfiz</a>
+          <a class="nav-item {% if nav=='pengtahfiz' %}active{% endif %}" href="{{ url_for('main.pengaturan_tahfiz') }}"><span class="dot">•</span> Pengaturan Rapor Tahfiz</a>
+          <a class="nav-item {% if nav=='nilaitahfiz' %}active{% endif %}" href="{{ url_for('main.nilai_tahfiz') }}"><span class="dot">•</span> Input Nilai Tahfiz</a>
+        </div>
+      </div>
+    </aside>
+    <main class="content">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for cat, msg in messages %}
+          <div class="flash {{ cat }}">{{ msg }}</div>
+        {% endfor %}
+      {% endwith %}
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+  <script>
+    document.querySelectorAll('.nav-toggle').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.getElementById(btn.dataset.toggle).classList.toggle('collapsed');
+      });
+    });
+  </script>
+</body>
+</html>

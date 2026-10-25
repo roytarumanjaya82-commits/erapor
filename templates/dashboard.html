@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Dasbor — eRapor SMPM22SETIABUDIPAMULANG{% endblock %}
+{% block content %}
+<h1 class="page-title">Dasbor</h1>
+<div class="card">
+  <div class="welcome-head">
+    <div>
+      <div class="kicker">PORTAL ERAPOR SMPM22SETIABUDIPAMULANG — SMP MUHAMMADIYAH 22 SETIABUDI PAMULANG</div>
+      <h2>Selamat Datang, {{ current_user.nama }}</h2>
+      <span class="badge">Admin Sekolah</span>
+    </div>
+    {% if tahun_aktif %}
+    <span class="year-pill">Tahun Ajaran {{ tahun_aktif.tahun }} Semester {{ tahun_aktif.semester }}</span>
+    {% endif %}
+  </div>
+  <div class="stats">
+    <div class="stat">
+      <div><div class="lbl">TOTAL ROMBEL</div><div class="val">{{ stats.rombel }}</div></div>
+      <div class="iconbox amber">🏫</div>
+    </div>
+    <div class="stat">
+      <div><div class="lbl">TOTAL SISWA</div><div class="val">{{ stats.siswa }}</div></div>
+      <div class="iconbox green">🎓</div>
+    </div>
+    <div class="stat">
+      <div><div class="lbl">TOTAL GURU</div><div class="val">{{ stats.guru }}</div></div>
+      <div class="iconbox violet">👥</div>
+    </div>
+    <div class="stat">
+      <div><div class="lbl">PEMBELAJARAN</div><div class="val">{{ stats.pelajaran }}</div></div>
+      <div class="iconbox blue">📘</div>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <h3 style="margin:0 0 12px">Progres Penilaian Semester Ini</h3>
+  <div class="progress-row">
+    <div class="progress-meta"><span>Perencanaan Penilaian Sekolah</span><span>{{ progress.rencana_pct }}%</span></div>
+    <div class="bar orange"><span style="width: {{ progress.rencana_pct }}%"></span></div>
+    <div class="sub">{{ progress.rencana_done }} dari {{ progress.rencana_total }} pembelajaran ter-mapping rencana</div>
+  </div>
+  <div class="progress-row">
+    <div class="progress-meta"><span>Asesmen Formatif (Penilaian Harian)</span><span>{{ progress.formatif_pct }}%</span></div>
+    <div class="bar blue"><span style="width: {{ progress.formatif_pct }}%"></span></div>
+    <div class="sub">{{ progress.formatif_done }} dari {{ progress.formatif_total }} entri nilai harian terisi</div>
+  </div>
+  <div class="progress-row">
+    <div class="progress-meta"><span>Asesmen Sumatif (ASTS/ASAS)</span><span>{{ progress.sumatif_pct }}%</span></div>
+    <div class="bar green"><span style="width: {{ progress.sumatif_pct }}%"></span></div>
+    <div class="sub">{{ progress.sumatif_done }} dari {{ progress.sumatif_total }} entri nilai tes sumatif terisi</div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Data Siswa{% endblock %}
+{% block content %}
+<h1 class="page-title">Data Siswa</h1>
+<div class="toolbar">
+  <form method="get" style="display:flex;gap:8px;flex-wrap:wrap">
+    <input class="search" name="q" value="{{ q }}" placeholder="Cari nama / NIS / NISN">
+    <select name="kelas_id" class="search" onchange="this.form.submit()">
+      <option value="">Semua kelas</option>
+      {% for k in kelas %}
+      <option value="{{ k.id }}" {% if kelas_id|string==k.id|string %}selected{% endif %}>{{ k.nama }}</option>
+      {% endfor %}
+    </select>
+    <button class="btn btn-ghost">Cari</button>
+  </form>
+  <a class="btn btn-primary" href="{{ url_for('main.form_siswa') }}">+ Tambah siswa</a>
+</div>
+<div class="card" style="padding:8px 16px 16px">
+  <table class="data">
+    <thead><tr><th>NIS</th><th>Nama</th><th>JK</th><th>Kelas</th><th>Status</th><th></th></tr></thead>
+    <tbody>
+    {% for r in rows %}
+      <tr>
+        <td>{{ r.nis }}</td><td>{{ r.nama }}</td><td>{{ r.jenis_kelamin }}</td><td>{{ r.kelas_nama or '-' }}</td><td>{{ r.status }}</td>
+        <td class="actions">
+          <a class="btn btn-ghost btn-sm" href="{{ url_for('main.form_siswa', item_id=r.id) }}">Ubah</a>
+          <form method="post" action="{{ url_for('main.hapus_siswa', item_id=r.id) }}" onsubmit="return confirm('Hapus siswa?')">
+            <button class="btn btn-danger btn-sm">Hapus</button>
+          </form>
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

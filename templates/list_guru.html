@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Data Guru{% endblock %}
+{% block content %}
+<h1 class="page-title">Data Guru</h1>
+<div class="toolbar">
+  <form method="get"><input class="search" name="q" value="{{ q }}" placeholder="Cari nama / NIP / NUPTK"></form>
+  <a class="btn btn-primary" href="{{ url_for('main.form_guru') }}">+ Tambah guru</a>
+</div>
+<div class="card" style="padding:8px 16px 16px">
+  <table class="data">
+    <thead><tr><th>Nama</th><th>NIP</th><th>JK</th><th>Status</th><th>HP</th><th></th></tr></thead>
+    <tbody>
+    {% for r in rows %}
+      <tr>
+        <td>{{ r.nama }}{% if r.gelar_belakang %}, {{ r.gelar_belakang }}{% endif %}</td>
+        <td>{{ r.nip }}</td>
+        <td>{{ r.jenis_kelamin }}</td>
+        <td>{{ r.status_kepegawaian }}</td>
+        <td>{{ r.no_hp }}</td>
+        <td class="actions">
+          <a class="btn btn-ghost btn-sm" href="{{ url_for('main.form_guru', item_id=r.id) }}">Ubah</a>
+          <form method="post" action="{{ url_for('main.hapus_guru', item_id=r.id) }}" onsubmit="return confirm('Hapus guru ini?')">
+            <button class="btn btn-danger btn-sm" type="submit">Hapus</button>
+          </form>
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

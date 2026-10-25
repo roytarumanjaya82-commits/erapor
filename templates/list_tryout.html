@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Tryout Kelas 12{% endblock %}
+{% block content %}
+<h1 class="page-title">Data Tryout (Kelas 12)</h1>
+<div class="card">
+  <form method="post" class="form-grid" style="margin-bottom:18px">
+    <div><label>Nama</label><input type="text" name="nama" required></div>
+    <div><label>Tanggal</label><input type="date" name="tanggal"></div>
+    <div><label>Tingkat</label><input type="text" name="tingkat" value="XII"></div>
+    <div style="display:flex;align-items:end"><button class="btn btn-primary">Tambah</button></div>
+  </form>
+  <table class="data">
+    <thead><tr><th>Nama</th><th>Tanggal</th><th>Tingkat</th><th></th></tr></thead>
+    <tbody>
+    {% for r in rows %}
+      <tr>
+        <td>{{ r.nama }}</td><td>{{ r.tanggal }}</td><td>{{ r.tingkat }}</td>
+        <td>
+          <form method="post" action="{{ url_for('main.hapus_tryout', item_id=r.id) }}" onsubmit="return confirm('Hapus?')">
+            <button class="btn btn-danger btn-sm">Hapus</button>
+          </form>
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Mata Pelajaran{% endblock %}
+{% block content %}
+<h1 class="page-title">Data Mata Pelajaran</h1>
+<div class="toolbar"><span></span><a class="btn btn-primary" href="{{ url_for('main.form_mapel') }}">+ Tambah mapel</a></div>
+<div class="card" style="padding:8px 16px 16px">
+  <table class="data">
+    <thead><tr><th>Kode</th><th>Nama</th><th>Kelompok</th><th>KKM</th><th></th></tr></thead>
+    <tbody>
+    {% for r in rows %}
+      <tr>
+        <td>{{ r.kode }}</td><td>{{ r.nama }}</td><td>{{ r.kelompok or '-' }}</td><td>{{ r.kkm_default }}</td>
+        <td class="actions">
+          <a class="btn btn-ghost btn-sm" href="{{ url_for('main.form_mapel', item_id=r.id) }}">Ubah</a>
+          <form method="post" action="{{ url_for('main.hapus_mapel', item_id=r.id) }}" onsubmit="return confirm('Hapus?')">
+            <button class="btn btn-danger btn-sm">Hapus</button>
+          </form>
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

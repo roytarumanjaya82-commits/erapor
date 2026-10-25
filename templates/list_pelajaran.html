@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Data Pelajaran{% endblock %}
+{% block content %}
+<h1 class="page-title">Data Pelajaran</h1>
+<div class="toolbar"><span>{{ rows|length }} pembelajaran</span><a class="btn btn-primary" href="{{ url_for('main.form_pelajaran') }}">+ Tambah</a></div>
+<div class="card" style="padding:8px 16px 16px">
+  <table class="data">
+    <thead><tr><th>Kelas</th><th>Mata pelajaran</th><th>Guru</th><th>JP</th><th></th></tr></thead>
+    <tbody>
+    {% for r in rows %}
+      <tr>
+        <td>{{ r.kelas_nama }}</td><td>{{ r.mapel_nama }}</td><td>{{ r.guru_nama }}</td><td>{{ r.jam_per_minggu }}</td>
+        <td class="actions">
+          <a class="btn btn-ghost btn-sm" href="{{ url_for('main.form_pelajaran', item_id=r.id) }}">Ubah</a>
+          <form method="post" action="{{ url_for('main.hapus_pelajaran', item_id=r.id) }}" onsubmit="return confirm('Hapus?')">
+            <button class="btn btn-danger btn-sm">Hapus</button>
+          </form>
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

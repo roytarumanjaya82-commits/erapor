@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Pengaturan Rapor Tahfiz{% endblock %}
+{% block content %}
+<h1 class="page-title">Pengaturan Rapor Tahfiz</h1>
+<div class="card">
+  <form method="post">
+    <div class="form-grid">
+      <div class="full"><label>Judul</label><input type="text" name="judul" value="{{ row.judul or 'Rapor Tahfiz' }}"></div>
+      <div class="full"><label>Keterangan</label><textarea name="keterangan">{{ row.keterangan or '' }}</textarea></div>
+      <div class="full"><label class="check"><input type="checkbox" name="tampilkan" {% if row.tampilkan != 0 %}checked{% endif %}> Tampilkan pada rapor</label></div>
+    </div>
+    <div class="form-actions"><button class="btn btn-primary">Simpan</button></div>
+  </form>
+</div>
+{% endblock %}

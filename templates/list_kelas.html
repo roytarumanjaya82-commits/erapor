@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Data Kelas{% endblock %}
+{% block content %}
+<h1 class="page-title">Data Kelas</h1>
+<div class="toolbar"><span></span><a class="btn btn-primary" href="{{ url_for('main.form_kelas') }}">+ Tambah kelas</a></div>
+<div class="card" style="padding:8px 16px 16px">
+  <table class="data">
+    <thead><tr><th>Kelas</th><th>Tingkat</th><th>Jurusan</th><th>Wali kelas</th><th>Kapasitas</th><th></th></tr></thead>
+    <tbody>
+    {% for r in rows %}
+      <tr>
+        <td>{{ r.nama }}</td><td>{{ r.tingkat }}</td><td>{{ r.jurusan }}</td><td>{{ r.wali or '-' }}</td><td>{{ r.kapasitas }}</td>
+        <td class="actions">
+          <a class="btn btn-ghost btn-sm" href="{{ url_for('main.form_kelas', item_id=r.id) }}">Ubah</a>
+          <form method="post" action="{{ url_for('main.hapus_kelas', item_id=r.id) }}" onsubmit="return confirm('Hapus kelas?')">
+            <button class="btn btn-danger btn-sm">Hapus</button>
+          </form>
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}
